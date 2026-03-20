@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.config import settings
 from routers.admin import router as admin_router
 from routers.auth import router as auth_router
 from routers.entry_exit_logs import router as entry_exit_logs_router
@@ -15,17 +16,14 @@ from routers.preferences import router as preferences_router
 from routers.reports import router as reports_router
 
 app = FastAPI(
-    title="Smart Parking Management API",
-    version="0.1.0",
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
     description="FastAPI backend for a smart parking management prototype.",
 )
 
-# TODO:
-# - Restrict allowed origins for production
-# - Move CORS settings to config/environment variables
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,8 +49,8 @@ def read_root():
     Root endpoint for the Smart Parking Management API.
     """
     return {
-        "message": "Smart Parking Management API is running.",
-        "version": "0.1.0",
+        "message": f"{settings.APP_NAME} is running.",
+        "version": settings.APP_VERSION,
     }
 
 

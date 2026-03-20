@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -6,6 +7,8 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from models.zones import Zone
 from models.users import User
+from models.occupancy import OccupancySnapshot
+from models.reservations import Reservation
 from routers.auth import require_admin
 from schemas.zones import (
     ApiResponse,
@@ -32,15 +35,27 @@ def _to_zone_detail(zone: Zone) -> ZoneDetail:
 
 def _build_zone_availability(zone: Zone, db: Session) -> ZoneAvailability:
     """
-    Build availability payload for a zone.
-
-    TODO:
-    - Replace placeholder metrics with real occupancy and reservation counts
-    - Occupancy and Reservation tables are needed for accurate counts
+    Build availability payload for a zone by calculating real-time occupancy
+    and current active reservations.
     """
-    # Placeholders for now until Occupancy/Reservation models are ready
-    occupied_count = 0
-    reserved_count = 0
+    # 1. Get latest occupancy snapshot
+    latest_snapshot = db.query(OccupancySnapshot).filter(
+        OccupancySnapshot.zone_id == zone.id
+    ).order_by(OccupancySnapshot.updated_at.desc()).first()
+    
+    occupied_count = latest_snapshot.occupied_count if latest_snapshot else 0
+
+    # 2. Get count of confirmed/active reservations for the current time
+    now = datetime.utcnow()
+    reserved_count = db.query(Reservation).filter(
+        Reservation.zone_id == zone.id,
+        Reservation.status.in_(["confirmed", "active"]),
+        Reservation.reservation_date == now.date(),
+        Reservation.start_time <= now.time(),
+        Reservation.end_time >= now.time()
+    ).count()
+
+    # 3. Calculate remaining capacity
     available_count = max(zone.capacity - occupied_count - reserved_count, 0)
 
     return ZoneAvailability(
