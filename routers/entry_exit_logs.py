@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -268,9 +268,6 @@ def list_entry_exit_logs(
     _: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """
-    Admin only. List gate logs with filters.
-    """
     if date_from and date_to and date_from > date_to:
         raise HTTPException(status_code=400, detail="date_from cannot be later than date_to.")
 
@@ -303,8 +300,6 @@ def list_entry_exit_logs(
         message="Entry/exit logs retrieved successfully.",
         data=data,
     )
-
-
 @router.get(
     "/current-inside",
     response_model=ApiResponse[List[CurrentInsideItem]],

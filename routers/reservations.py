@@ -36,8 +36,20 @@ def _to_reservation_summary(reservation: Reservation) -> ReservationSummary:
     return ReservationSummary.model_validate(reservation)
 
 
-def _to_reservation_detail(reservation: Reservation) -> ReservationDetail:
-    return ReservationDetail.model_validate(reservation)
+def _to_reservation_detail(reservation: Reservation, vehical_no: str = None, username: str = None) -> ReservationDetail:
+    return ReservationDetail(
+        id=reservation.id,
+        start_time=reservation.start_time.strftime("%H:%M:%S") if reservation.start_time else None,
+        end_time=reservation.end_time.strftime("%H:%M:%S") if reservation.end_time else None,
+        user_id=reservation.user_id,
+        status=reservation.status,
+        notes=reservation.notes,
+        vehicle_id=reservation.vehicle_id,
+        zone_id=reservation.zone_id,
+        vehicalNo=vehical_no,
+        username=username,
+        reservation_date=reservation.reservation_date.strftime("%Y-%m-%d") if reservation.reservation_date else None
+    )
 
 
 def _ensure_owner_or_admin(reservation: Reservation, current_user: User) -> None:
@@ -150,7 +162,41 @@ def _check_zone_capacity_rules(
             detail="Zone capacity exceeded for the selected time range.",
         )
 
+@router.get(
+    "/",
+    response_model=ApiResponse[ReservationListResponse],
+    status_code=status.HTTP_200_OK,
+)
+def get_all_reservations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Reservation).join(
+        Vehicle, Reservation.vehicle_id == Vehicle.id
+    ).join(
+        User, Reservation.user_id == User.id
+    )
 
+    if current_user.role != 'admin':
+        query = query.filter(Reservation.user_id == current_user.id)
+
+    results = query.add_columns(
+        Vehicle.plate_number,
+        User.username
+    ).all()
+
+    reservation_items = [
+        _to_reservation_detail(r, plate_number, username)
+        for r, plate_number, username in results
+    ]
+
+    return ApiResponse(
+        message="Reservations retrieved successfully.",
+        data=ReservationListResponse(
+            items=reservation_items,
+            total=len(reservation_items)
+        )
+    )
 @router.post(
     "/",
     response_model=ApiResponse[ReservationDetail],

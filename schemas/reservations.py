@@ -69,19 +69,28 @@ class ReservationSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ReservationDetail(ReservationSummary):
-    pass
-
-
-class ReservationListResponse(BaseModel):
-    items: List[ReservationSummary]
-    total: int
-
-
 T = TypeVar("T")
 
-
 class ApiResponse(BaseModel, Generic[T]):
-    success: bool = True
     message: str
-    data: Optional[T] = None
+    data: T
+
+class ReservationDetail(BaseModel):
+    id: int
+    start_time: Optional[str]
+    end_time: Optional[str]
+    user_id: int
+    status: str
+    notes: Optional[str]
+    vehicle_id: int
+    zone_id: int
+    vehicalNo: Optional[str]
+    username: Optional[str]
+    reservation_date: Optional[str]
+
+    class Config:
+        orm_mode = True
+
+class ReservationListResponse(BaseModel):
+    items: List[ReservationDetail]
+    total: int

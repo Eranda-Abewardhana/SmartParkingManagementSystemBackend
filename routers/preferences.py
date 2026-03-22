@@ -1,19 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import desc, func
+
 from core.database import get_db
 from models.users import User
 from models.preferences import UserPreference
-from schemas.preferences import UserPreferenceRead, UserPreferenceUpdate
+from models.notifications import Notification, UserSettingsResponse, NotificationListPreview, NotificationSummary, \
+    SettingsRequest
 from routers.auth import get_current_user
 from schemas.auth import ApiResponse
+from schemas.preferences import UserPreferenceRead
+from pydantic import BaseModel, ConfigDict
+from typing import List
+from datetime import datetime
 
-router = APIRouter(prefix="/preferences", tags=["preferences"])
+router = APIRouter(prefix="/preferences", tags=["settings"])
 
 
 def _get_or_create_preferences(db: Session, user_id: int) -> UserPreference:
-    """
-    Ensure a preference object exists for the user.
-    """
     prefs = db.query(UserPreference).filter(UserPreference.user_id == user_id).first()
     if not prefs:
         prefs = UserPreference(user_id=user_id)
@@ -22,7 +26,6 @@ def _get_or_create_preferences(db: Session, user_id: int) -> UserPreference:
         db.refresh(prefs)
     return prefs
 
-
 @router.get(
     "/me",
     response_model=ApiResponse[UserPreferenceRead],
@@ -30,47 +33,61 @@ def _get_or_create_preferences(db: Session, user_id: int) -> UserPreference:
 )
 def get_my_preferences(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
-    Retrieve current user's preferences.
+    Get current logged-in user's preferences
     """
     prefs = _get_or_create_preferences(db, current_user.id)
+
     return ApiResponse(
         message="Preferences retrieved successfully.",
         data=UserPreferenceRead.model_validate(prefs),
     )
 
-
 @router.patch(
     "/me",
-    response_model=ApiResponse[UserPreferenceRead],
+    response_model=ApiResponse[UserSettingsResponse],
     status_code=status.HTTP_200_OK,
 )
-def update_my_preferences(
-    payload: UserPreferenceUpdate,
+def get_my_settings(
+    payload: SettingsRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Update specific user preferences.
-    """
     prefs = _get_or_create_preferences(db, current_user.id)
 
-    update_data = payload.model_dump(exclude_unset=True)
-    if not update_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No fields provided for update.",
+    notifications = (
+        db.query(Notification)
+        .filter(Notification.user_id == current_user.id)
+        .order_by(desc(Notification.created_at))
+        .limit(payload.limit)
+        .all()
+    )
+
+    unread_count = (
+        db.query(func.count(Notification.id))
+        .filter(
+            Notification.user_id == current_user.id,
+            Notification.is_read == False,
         )
+        .scalar()
+    )
 
-    for field, value in update_data.items():
-        setattr(prefs, field, value)
-
-    db.commit()
-    db.refresh(prefs)
+    total = (
+        db.query(func.count(Notification.id))
+        .filter(Notification.user_id == current_user.id)
+        .scalar()
+    )
 
     return ApiResponse(
-        message="Preferences updated successfully.",
-        data=UserPreferenceRead.model_validate(prefs),
+        message="Settings retrieved successfully.",
+        data=UserSettingsResponse(
+            preferences=UserPreferenceRead.model_validate(prefs),
+            notifications=NotificationListPreview(
+                items=[NotificationSummary.model_validate(n) for n in notifications],
+                total=total,
+                unread_count=unread_count,
+            ),
+        ),
     )
