@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
@@ -20,6 +20,7 @@ from schemas.lpr import (
     LprDetectionSummary,
     LprReviewStatus,
 )
+from services.vision import VisionService
 
 router = APIRouter(prefix="/lpr", tags=["lpr"])
 
@@ -46,13 +47,73 @@ def _active_reservation_for_vehicle(db: Session, vehicle_id: int, at_time: datet
 
 
 @router.post(
+    "/detect-from-image",
+    response_model=ApiResponse[LprDetectionDetail],
+    status_code=status.HTTP_201_CREATED,
+)
+async def detect_from_image(
+    source_camera: str = Query(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    UPLOAD an image and have the backend automatically run OCR to detect the plate.
+    """
+    image_bytes = await file.read()
+    
+    # Run the Computer Vision Service
+    detected_plate, confidence = VisionService.recognize_plate(image_bytes)
+    
+    detected_at = datetime.utcnow()
+    matched_vehicle_id = None
+    matched_user_id = None
+    matched_reservation_id = None
+    review_status = LprReviewStatus.UNMATCHED.value
+
+    # Search for matching vehicle
+    vehicle = db.query(Vehicle).filter(
+        Vehicle.plate_number == detected_plate,
+        Vehicle.is_active == True
+    ).first()
+
+    if vehicle:
+        matched_vehicle_id = vehicle.id
+        matched_user_id = vehicle.owner_user_id
+        reservation = _active_reservation_for_vehicle(db, vehicle.id, detected_at)
+        if reservation:
+            matched_reservation_id = reservation.id
+        review_status = LprReviewStatus.MATCHED.value
+
+    new_detection = LprDetection(
+        detected_plate=detected_plate,
+        confidence=confidence,
+        image_url_or_path=f"upload://{file.filename}",
+        source_camera=source_camera,
+        detected_at=detected_at,
+        matched_vehicle_id=matched_vehicle_id,
+        matched_user_id=matched_user_id,
+        matched_reservation_id=matched_reservation_id,
+        review_status=review_status,
+        corrected_plate=None,
+    )
+    db.add(new_detection)
+    db.commit()
+    db.refresh(new_detection)
+
+    return ApiResponse(
+        message=f"Image processed. Detected Plate: {detected_plate}",
+        data=_to_detection_detail(new_detection),
+    )
+
+
+@router.post(
     "/detections",
     response_model=ApiResponse[LprDetectionDetail],
     status_code=status.HTTP_201_CREATED,
 )
 def create_lpr_detection(payload: LprDetectionCreateRequest, db: Session = Depends(get_db)):
     """
-    Receive a detection result from the Python vision service.
+    Receive a detection result from the Python vision service (Pre-processed).
     """
     detected_at = payload.detected_at or datetime.utcnow()
     matched_vehicle_id = None

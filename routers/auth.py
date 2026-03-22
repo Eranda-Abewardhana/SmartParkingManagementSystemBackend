@@ -217,7 +217,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         data=LoginResponse(
             access_token=access_token,
             token_type="bearer",
-            user=_to_user_summary(user),
+            user=_to_user_summary(user).model_dump(),  # convert to dict
         ),
     )
 
