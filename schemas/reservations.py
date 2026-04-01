@@ -18,15 +18,26 @@ class ReservationStatus(str, Enum):
 class ReservationBase(BaseModel):
     vehicle_id: int = Field(..., ge=1)
     zone_id: int = Field(..., ge=1)
+    slot_number: str = Field(..., min_length=1, max_length=20)
+
     reservation_date: date
     start_time: time
     end_time: time
+
     notes: Optional[str] = Field(default=None, max_length=255)
 
     @model_validator(mode="after")
     def validate_time_range(self):
         if self.start_time >= self.end_time:
             raise ValueError("start_time must be earlier than end_time.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_reservation_date(self):
+        from datetime import date as _date
+
+        if self.reservation_date < _date.today():
+            raise ValueError("reservation_date cannot be in the past.")
         return self
 
 
@@ -44,6 +55,14 @@ class ReservationRescheduleRequest(BaseModel):
     def validate_time_range(self):
         if self.start_time >= self.end_time:
             raise ValueError("start_time must be earlier than end_time.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_reservation_date(self):
+        from datetime import date as _date
+
+        if self.reservation_date < _date.today():
+            raise ValueError("reservation_date cannot be in the past.")
         return self
 
 
@@ -65,15 +84,18 @@ class ReservationSummary(BaseModel):
     end_time: time
     status: ReservationStatus
     notes: Optional[str] = None
+    slot_number: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 T = TypeVar("T")
 
+
 class ApiResponse(BaseModel, Generic[T]):
     message: str
     data: T
+
 
 class ReservationDetail(BaseModel):
     id: int
@@ -84,12 +106,14 @@ class ReservationDetail(BaseModel):
     notes: Optional[str]
     vehicle_id: int
     zone_id: int
-    vehicalNo: Optional[str]
-    username: Optional[str]
-    reservation_date: Optional[str]
+    vehicalNo: Optional[str] = None
+    username: Optional[str] = None
+    zone_name: Optional[str] = None
+    reservation_date: Optional[str] = None
+    slot_number: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ReservationListResponse(BaseModel):
     items: List[ReservationDetail]

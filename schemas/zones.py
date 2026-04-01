@@ -1,3 +1,4 @@
+from datetime import date, time
 from enum import Enum
 from typing import Generic, List, Optional, TypeVar
 
@@ -83,3 +84,29 @@ class ApiResponse(BaseModel, Generic[T]):
     success: bool = True
     message: str
     data: Optional[T] = None
+
+
+
+class SlotAvailability(BaseModel):
+    slot_id: int
+    slot_number: str
+    status: str
+    is_available: bool
+    reservation_id: Optional[int] = None
+
+
+class ZoneAvailability(BaseModel):
+    zone_id: int
+    zone_name: str
+    zone_code: str
+    zone_type: str
+    capacity: int
+    active: bool
+    blocked: bool
+    reservation_date: date
+    start_time: time
+    end_time: time
+    total_slots: int
+    available_slots: int
+    occupied_slots: int
+    slots: List[SlotAvailability]

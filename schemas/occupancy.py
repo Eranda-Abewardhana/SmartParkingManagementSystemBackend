@@ -1,28 +1,31 @@
 from datetime import datetime
 from enum import Enum
-from typing import Generic, List, Optional, TypeVar
-
+from typing import List, Optional, Generic, TypeVar
 from pydantic import BaseModel, Field
 
+T = TypeVar("T")
 
 class OccupancySource(str, Enum):
+    SYSTEM = "system"
+    SENSOR = "sensor"
     CAMERA = "camera"
     MANUAL = "manual"
-    SYSTEM = "system"
 
+class ApiResponse(BaseModel, Generic[T]):
+    success: bool = True
+    message: str
+    data: Optional[T] = None
 
 class OccupancyUpdateRequest(BaseModel):
-    zone_id: int = Field(..., ge=1)
-    occupied_count: int = Field(..., ge=0)
-    source: OccupancySource
+    zone_id: int
+    occupied_count: int
     updated_at: Optional[datetime] = None
-
+    source: OccupancySource = OccupancySource.SYSTEM
 
 class OccupancyManualAdjustRequest(BaseModel):
-    occupied_count: int = Field(..., ge=0)
-    source: OccupancySource = OccupancySource.MANUAL
+    occupied_count: int
     updated_at: Optional[datetime] = None
-
+    source: OccupancySource = OccupancySource.MANUAL
 
 class ZoneOccupancySummary(BaseModel):
     zone_id: int
@@ -32,20 +35,14 @@ class ZoneOccupancySummary(BaseModel):
     available_count: int
     total_capacity: int
     updated_at: datetime
-    source: OccupancySource
+    source: str
     active: bool
     blocked: bool
-
 
 class ZoneOccupancyListResponse(BaseModel):
     items: List[ZoneOccupancySummary]
     total: int
 
-
-T = TypeVar("T")
-
-
-class ApiResponse(BaseModel, Generic[T]):
-    success: bool = True
-    message: str
-    data: Optional[T] = None
+# NEW SCHEMA FOR STREAMING
+class StartStreamRequest(BaseModel):
+    url: str = Field(..., description="Camera URL (RTSP, HTTP, or 0 for webcam)")

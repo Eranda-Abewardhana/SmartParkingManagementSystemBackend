@@ -15,3 +15,4 @@ opencv-python
 easyocr
 numpy
 reportlab
+requests

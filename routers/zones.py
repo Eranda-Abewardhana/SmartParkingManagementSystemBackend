@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import date, time, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from models.users import User
 from models.occupancy import OccupancySnapshot
 from models.reservations import Reservation
 from routers.auth import require_admin
+from routers.reservations import _expire_past_reservations
 from schemas.zones import (
     ApiResponse,
     ZoneAvailability,
@@ -19,10 +20,13 @@ from schemas.zones import (
     ZoneStatusUpdateRequest,
     ZoneSummary,
     ZoneType,
-    ZoneUpdateRequest,
+    ZoneUpdateRequest, SlotAvailability,
 )
 
 router = APIRouter(prefix="/zones", tags=["zones"])
+
+ACTIVE_STATUSES = {"pending", "confirmed", "active"}
+
 
 
 def _to_zone_summary(zone: Zone) -> ZoneSummary:
@@ -33,256 +37,256 @@ def _to_zone_detail(zone: Zone) -> ZoneDetail:
     return ZoneDetail.model_validate(zone)
 
 
-def _build_zone_availability(zone: Zone, db: Session) -> ZoneAvailability:
-    """
-    Build availability payload for a zone by calculating real-time occupancy
-    and current active reservations.
-    """
-    # 1. Get latest occupancy snapshot
-    latest_snapshot = db.query(OccupancySnapshot).filter(
-        OccupancySnapshot.zone_id == zone.id
-    ).order_by(OccupancySnapshot.updated_at.desc()).first()
-    
-    occupied_count = latest_snapshot.occupied_count if latest_snapshot else 0
+def _times_overlap(
+    start_1: time,
+    end_1: time,
+    start_2: time,
+    end_2: time,
+) -> bool:
+    return start_1 < end_2 and start_2 < end_1
 
-    # 2. Get count of confirmed/active reservations for the current time
-    now = datetime.utcnow()
-    reserved_count = db.query(Reservation).filter(
-        Reservation.zone_id == zone.id,
-        Reservation.status.in_(["confirmed", "active"]),
-        Reservation.reservation_date == now.date(),
-        Reservation.start_time <= now.time(),
-        Reservation.end_time >= now.time()
-    ).count()
 
-    # 3. Calculate remaining capacity
-    available_count = max(zone.capacity - occupied_count - reserved_count, 0)
+import math
+import string
+
+
+def generate_slots_by_capacity(capacity: int, cols_per_row: int = 4) -> list[str]:
+    slots = []
+    letters = string.ascii_uppercase
+
+    if capacity <= 0:
+        return slots
+
+    row_count = math.ceil(capacity / cols_per_row)
+
+    for r in range(row_count):
+        for c in range(1, cols_per_row + 1):
+            if len(slots) >= capacity:
+                break
+            slots.append(f"{letters[r]}{c}")
+
+    return slots
+
+
+def _build_zone_availability_for_slot(
+    zone: Zone,
+    db: Session,
+    reservation_date: date,
+    start_time: time,
+    end_time: time,
+) -> ZoneAvailability:
+    reservations = (
+        db.query(Reservation)
+        .filter(
+            Reservation.zone_id == zone.id,
+            Reservation.reservation_date == reservation_date,
+            Reservation.status == 'confirmed',
+        )
+        .all()
+    )
+
+    reserved_slot_map: dict[str, Reservation] = {}
+
+    for reservation in reservations:
+        print(
+            f"CHECK RESERVATION => "
+            f"id={reservation.id}, "
+            f"zone_id={reservation.zone_id}, "
+            f"date={reservation.reservation_date}, "
+            f"start={reservation.start_time}, "
+            f"end={reservation.end_time}, "
+            f"status={reservation.status}, "
+            f"slot_number={reservation.slot_number}"
+        )
+
+        if not reservation.slot_number:
+            print(f"SKIP RESERVATION {reservation.id}: slot_number is empty")
+            continue
+
+        if not reservation.start_time or not reservation.end_time:
+            print(f"SKIP RESERVATION {reservation.id}: missing start/end time")
+            continue
+
+        overlap = _times_overlap(
+            reservation.start_time,
+            reservation.end_time,
+            start_time,
+            end_time,
+        )
+
+        print(
+            f"OVERLAP CHECK => reservation_id={reservation.id}, "
+            f"reservation_time={reservation.start_time}->{reservation.end_time}, "
+            f"requested_time={start_time}->{end_time}, "
+            f"overlap={overlap}"
+        )
+
+        if not overlap:
+            continue
+
+        normalized_slot = reservation.slot_number.strip().upper()
+        reserved_slot_map[normalized_slot] = reservation
+
+        print(
+            f"MARK RESERVED => slot={normalized_slot}, "
+            f"reservation_id={reservation.id}, "
+            f"status={reservation.status}"
+        )
+
+    generated_slots = generate_slots_by_capacity(
+        capacity=zone.capacity,
+        cols_per_row=4,
+    )
+
+    slot_items = []
+    for index, slot_number in enumerate(generated_slots, start=1):
+        normalized_slot = slot_number.strip().upper()
+        reservation = reserved_slot_map.get(normalized_slot)
+
+        if reservation is not None:
+            reservation_id = reservation.id
+            slot_status = reservation.status
+            is_available = False
+        else:
+            reservation_id = None
+            slot_status = "available"
+            is_available = True
+
+        print(
+            f"GRID SLOT => {normalized_slot} | "
+            f"status={slot_status} | "
+            f"available={is_available} | "
+            f"reservation_id={reservation_id}"
+        )
+
+        slot_items.append(
+            SlotAvailability(
+                slot_id=index,
+                slot_number=normalized_slot,
+                status=slot_status,
+                is_available=is_available,
+                reservation_id=reservation_id,
+            )
+        )
+
+    total_slots = len(slot_items)
+    available_slots = sum(1 for slot in slot_items if slot.is_available)
+    occupied_slots = total_slots - available_slots
+
+    print(f"ZONE: {zone.name}")
+    print(f"CAPACITY: {zone.capacity}")
+    print(f"DATE: {reservation_date}")
+    print(f"TIME: {start_time} -> {end_time}")
+    print(f"GENERATED SLOTS: {generated_slots}")
+    print(
+        "RESERVED SLOT MAP: "
+        f"{ {slot: {'id': r.id, 'status': r.status} for slot, r in reserved_slot_map.items()} }"
+    )
+
+    for item in slot_items:
+        print(
+            f"SLOT {item.slot_number} | "
+            f"available={item.is_available} | "
+            f"status={item.status} | "
+            f"reservation_id={item.reservation_id}"
+        )
 
     return ZoneAvailability(
         zone_id=zone.id,
         zone_name=zone.name,
-        code=zone.code,
+        zone_code=zone.code,
+        zone_type=zone.zone_type,
         capacity=zone.capacity,
-        occupied_count=occupied_count,
-        reserved_count=reserved_count,
-        available_count=available_count,
         active=zone.active,
         blocked=zone.blocked,
+        reservation_date=reservation_date,
+        start_time=start_time,
+        end_time=end_time,
+        total_slots=total_slots,
+        available_slots=available_slots,
+        occupied_slots=occupied_slots,
+        slots=slot_items,
     )
+def _build_zone_availability_now(
+    zone: Zone,
+    db: Session,
+) -> ZoneAvailability:
+    now = datetime.now()
+    current_date = now.date()
+    current_time = now.time().replace(microsecond=0)
+    next_time = (now + timedelta(hours=1)).time().replace(microsecond=0)
 
-
-@router.post(
-    "/",
-    response_model=ApiResponse[ZoneDetail],
-    status_code=status.HTTP_201_CREATED,
-)
-def create_zone(
-    payload: ZoneCreateRequest,
-    _: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    """
-    Create a new parking zone. Admin only.
-    """
-    existing = db.query(Zone).filter(
-        Zone.code == payload.code.strip().upper()
-    ).first()
-
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A zone with this code already exists.",
-        )
-
-    new_zone = Zone(
-        name=payload.name,
-        code=payload.code.strip().upper(),
-        zone_type=payload.zone_type.value,
-        capacity=payload.capacity,
-        active=payload.active,
-        blocked=payload.blocked,
-        description=payload.description,
+    return _build_zone_availability_for_slot(
+        zone=zone,
+        db=db,
+        reservation_date=current_date,
+        start_time=current_time,
+        end_time=next_time,
     )
-
-    db.add(new_zone)
-    db.commit()
-    db.refresh(new_zone)
-
-    return ApiResponse(
-        message="Zone created successfully.",
-        data=_to_zone_detail(new_zone),
-    )
-
-
 @router.get(
-    "/",
-    response_model=ApiResponse[ZoneListResponse],
+    "/availability/list",
+    response_model=ApiResponse[List[ZoneAvailability]],
     status_code=status.HTTP_200_OK,
 )
-def list_zones(
-    active: Optional[bool] = Query(default=None),
-    blocked: Optional[bool] = Query(default=None),
+def list_zone_availabilities(
+    reservation_date: date = Query(..., alias="date"),
+    start_time: time = Query(...),
+    end_time: time = Query(...),
     zone_type: Optional[ZoneType] = Query(default=None),
+    active_only: bool = Query(default=True),
+    exclude_blocked: bool = Query(default=True),
     db: Session = Depends(get_db),
 ):
     """
-    List all parking zones with optional filters.
+    Return availability for all zones for a selected date/time slot.
     """
+    _expire_past_reservations(db)
+    if start_time >= end_time:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="end_time must be after start_time.",
+        )
+
     query = db.query(Zone)
 
-    if active is not None:
-        query = query.filter(Zone.active == active)
+    if active_only:
+        query = query.filter(Zone.active.is_(True))
 
-    if blocked is not None:
-        query = query.filter(Zone.blocked == blocked)
+    if exclude_blocked:
+        query = query.filter(Zone.blocked.is_(False))
 
     if zone_type is not None:
         query = query.filter(Zone.zone_type == zone_type.value)
 
-    zones = query.all()
+    zones = query.order_by(Zone.id.asc()).all()
 
-    data = ZoneListResponse(
-        items=[_to_zone_summary(zone) for zone in zones],
-        total=len(zones),
-    )
+    items = [
+        _build_zone_availability_for_slot(
+            zone=zone,
+            db=db,
+            reservation_date=reservation_date,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        for zone in zones
+    ]
 
     return ApiResponse(
-        message="Zones retrieved successfully.",
-        data=data,
+        message="Zone availabilities retrieved successfully.",
+        data=items,
     )
-
-
-@router.get(
-    "/{zone_id}",
-    response_model=ApiResponse[ZoneDetail],
-    status_code=status.HTTP_200_OK,
-)
-def get_zone(zone_id: int, db: Session = Depends(get_db)):
-    """
-    Return zone details by ID.
-    """
-    zone = db.query(Zone).filter(Zone.id == zone_id).first()
-    if not zone:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Zone not found.",
-        )
-
-    return ApiResponse(
-        message="Zone retrieved successfully.",
-        data=_to_zone_detail(zone),
-    )
-
-
-@router.put(
-    "/{zone_id}",
-    response_model=ApiResponse[ZoneDetail],
-    status_code=status.HTTP_200_OK,
-)
-def update_zone(
-    zone_id: int,
-    payload: ZoneUpdateRequest,
-    _: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    """
-    Update a parking zone. Admin only.
-    """
-    zone = db.query(Zone).filter(Zone.id == zone_id).first()
-    if not zone:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Zone not found.",
-        )
-
-    update_data = payload.model_dump(exclude_unset=True)
-    if not update_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No fields provided for update.",
-        )
-
-    if "code" in update_data:
-        new_code = update_data["code"].strip().upper()
-        duplicate = db.query(Zone).filter(
-            Zone.code == new_code,
-            Zone.id != zone_id
-        ).first()
-        if duplicate:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A zone with this code already exists.",
-            )
-        zone.code = new_code
-
-    if "zone_type" in update_data:
-        zone.zone_type = update_data["zone_type"].value
-
-    for field in ["name", "capacity", "active", "blocked", "description"]:
-        if field in update_data:
-            setattr(zone, field, update_data[field])
-
-    db.commit()
-    db.refresh(zone)
-
-    return ApiResponse(
-        message="Zone updated successfully.",
-        data=_to_zone_detail(zone),
-    )
-
-
-@router.patch(
-    "/{zone_id}/status",
-    response_model=ApiResponse[ZoneDetail],
-    status_code=status.HTTP_200_OK,
-)
-def update_zone_status(
-    zone_id: int,
-    payload: ZoneStatusUpdateRequest,
-    _: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    """
-    Update zone active/blocked state. Admin only.
-    """
-    zone = db.query(Zone).filter(Zone.id == zone_id).first()
-    if not zone:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Zone not found.",
-        )
-
-    update_data = payload.model_dump(exclude_unset=True)
-    if not update_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No status fields provided for update.",
-        )
-
-    if "active" in update_data:
-        zone.active = update_data["active"]
-
-    if "blocked" in update_data:
-        zone.blocked = update_data["blocked"]
-
-    db.commit()
-    db.refresh(zone)
-
-    return ApiResponse(
-        message="Zone status updated successfully.",
-        data=_to_zone_detail(zone),
-    )
-
-
 @router.get(
     "/{zone_id}/availability",
     response_model=ApiResponse[ZoneAvailability],
     status_code=status.HTTP_200_OK,
 )
-def get_zone_availability(zone_id: int, db: Session = Depends(get_db)):
-    """
-    Return zone availability summary.
-    """
+def get_zone_availability(
+    zone_id: int,
+    date_value: Optional[date] = Query(default=None, alias="date"),
+    start_time: Optional[time] = Query(default=None),
+    end_time: Optional[time] = Query(default=None),
+    db: Session = Depends(get_db),
+):
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
     if not zone:
         raise HTTPException(
@@ -290,7 +294,31 @@ def get_zone_availability(zone_id: int, db: Session = Depends(get_db)):
             detail="Zone not found.",
         )
 
-    availability = _build_zone_availability(zone, db)
+    if not zone.active or zone.blocked:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Zone is not available for reservations.",
+        )
+
+    if date_value and start_time and end_time:
+        if start_time >= end_time:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="end_time must be after start_time.",
+            )
+
+        availability = _build_zone_availability_for_slot(
+            zone=zone,
+            db=db,
+            reservation_date=date_value,
+            start_time=start_time,
+            end_time=end_time,
+        )
+    else:
+        availability = _build_zone_availability_now(
+            zone=zone,
+            db=db,
+        )
 
     return ApiResponse(
         message="Zone availability retrieved successfully.",

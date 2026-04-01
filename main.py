@@ -1,9 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import threading
+import time
 
 from core.config import settings
+from core.database import SessionLocal
+from models.cameras import Camera
+from services import camera_processor
+
 from routers.admin import router as admin_router
 from routers.auth import router as auth_router
+from routers.cameras import cameras_router
 from routers.entry_exit_logs import router as entry_exit_logs_router
 from routers.lpr import router as lpr_router
 from routers.notifications import router as notifications_router
@@ -41,25 +48,38 @@ app.include_router(admin_router)
 app.include_router(notifications_router)
 app.include_router(preferences_router)
 app.include_router(reports_router)
+app.include_router(cameras_router)
 
+def start_autonomous_monitoring():
+    """
+    Automatically starts AI monitoring for all cameras in the database on server startup.
+    """
+    print("\n" + "="*60, flush=True)
+    print("AUTONOMOUS MONITORING SYSTEM: Initializing...", flush=True)
+    print("="*60, flush=True)
+    
+    # Wait a few seconds for DB/app to be fully ready
+    time.sleep(3)
+    
+    db = SessionLocal()
+    try:
+        cameras = db.query(Camera).all()
+        if not cameras:
+            print("[AUTONOMOUS] No cameras found in database. Monitoring skipped.", flush=True)
+            return
 
-@app.get("/", tags=["root"])
-def read_root():
-    """
-    Root endpoint for the Smart Parking Management API.
-    """
-    return {
-        "message": f"{settings.APP_NAME} is running.",
-        "version": settings.APP_VERSION,
-    }
+        for cam in cameras:
+            print(f"[AUTONOMOUS] Starting monitoring for {cam.name} (URL: {cam.url})...", flush=True)
+            camera_processor.start_monitoring(cam.id, cam.url, cam.zone_id)
+            
+        print(f"[AUTONOMOUS] Successfully started monitoring for {len(cameras)} cameras.", flush=True)
+    except Exception as e:
+        print(f"[AUTONOMOUS ERROR] Failed to start auto-monitoring: {e}", flush=True)
+    finally:
+        db.close()
+    print("="*60 + "\n", flush=True)
 
-
-@app.get("/health", tags=["health"])
-def health_check():
-    """
-    Basic health check endpoint.
-    """
-    return {
-        "status": "ok",
-        "service": "smart-parking-api",
-    }
+@app.on_event("startup")
+async def startup_event():
+    # Run the monitoring startup in a separate thread so it doesn't block the FastAPI startup
+    threading.Thread(target=start_autonomous_monitoring, daemon=True).start()
