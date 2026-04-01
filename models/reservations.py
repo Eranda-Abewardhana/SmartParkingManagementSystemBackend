@@ -9,6 +9,7 @@ class Reservation(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
     zone_id = Column(Integer, ForeignKey("zones.id"), nullable=False)
+    slot_number = Column(String, nullable=True)  # Added slot number
     reservation_date = Column(Date, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)

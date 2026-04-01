@@ -1,12 +1,12 @@
 import asyncio
 from datetime import datetime
 from typing import List, Optional, Any
-from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, WebSocket, WebSocketDisconnect, BackgroundTasks
+
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, WebSocket, WebSocketDisconnect, BackgroundTasks, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from core.database import get_db
+from core.database import get_db, SessionLocal
 from models.occupancy import OccupancySnapshot
 from models.zones import Zone
 from models.users import User
@@ -18,8 +18,9 @@ from schemas.occupancy import (
     OccupancyUpdateRequest,
     ZoneOccupancyListResponse,
     ZoneOccupancySummary,
+    StartStreamRequest,
 )
-from services.vision import VisionService
+from services.vision_ai_service import VisionService
 
 router = APIRouter(prefix="/occupancy", tags=["occupancy"])
 
@@ -27,21 +28,10 @@ router = APIRouter(prefix="/occupancy", tags=["occupancy"])
 def _build_zone_summary(zone: Zone, db: Session) -> ZoneOccupancySummary:
     """
     Build zone occupancy summary from zone metadata and latest occupancy snapshot.
-    Safely handles missing tables and failed transactions.
     """
-    snapshot = None
-
-    try:
-        snapshot = (
-            db.query(OccupancySnapshot)
-            .filter(OccupancySnapshot.zone_id == zone.id)
-            .order_by(OccupancySnapshot.updated_at.desc())
-            .first()
-        )
-    except SQLAlchemyError:
-        # Rollback session in case previous transaction failed or table missing
-        db.rollback()
-        snapshot = None
+    snapshot = db.query(OccupancySnapshot).filter(
+        OccupancySnapshot.zone_id == zone.id
+    ).order_by(OccupancySnapshot.updated_at.desc()).first()
 
     occupied_count = snapshot.occupied_count if snapshot else 0
     updated_at = snapshot.updated_at if snapshot else datetime.utcnow()
@@ -61,6 +51,7 @@ def _build_zone_summary(zone: Zone, db: Session) -> ZoneOccupancySummary:
         active=zone.active,
         blocked=zone.blocked,
     )
+
 
 def _validate_occupied_count(zone: Zone, occupied_count: int) -> None:
     if occupied_count < 0:
@@ -87,8 +78,7 @@ async def detect_from_camera(
     db: Session = Depends(get_db)
 ):
     """
-    UPLOAD an image of a parking zone. The backend will use YOLO to count vehicles
-    and update the zone occupancy automatically.
+    UPLOAD an image/video file. The backend will use AI to count vehicles.
     """
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
     if not zone:
@@ -96,7 +86,7 @@ async def detect_from_camera(
 
     image_bytes = await file.read()
     
-    # Run YOLO vehicle counting service
+    # Run AI vehicle counting service
     occupied_count = VisionService.count_vehicles_in_zone(image_bytes)
     
     _validate_occupied_count(zone, occupied_count)
@@ -112,45 +102,9 @@ async def detect_from_camera(
     db.refresh(new_snapshot)
 
     return ApiResponse(
-        message=f"Camera detection complete. {occupied_count} vehicles found in {zone.name}.",
+        message=f"Detection complete. {occupied_count} vehicles found in {zone.name}.",
         data=_build_zone_summary(zone, db),
     )
-
-
-@router.websocket("/ws/detect-stream/{zone_id}")
-async def detect_stream(websocket: WebSocket, zone_id: int, db: Session = Depends(get_db)):
-    """
-    WebSocket endpoint for continuously pushing frames from an edge device (e.g. mobile app).
-    """
-    await websocket.accept()
-    
-    zone = db.query(Zone).filter(Zone.id == zone_id).first()
-    if not zone:
-        await websocket.close(code=1008)
-        return
-
-    try:
-        while True:
-            image_bytes = await websocket.receive_bytes()
-            occupied_count = VisionService.count_vehicles_in_zone(image_bytes)
-            
-            new_snapshot = OccupancySnapshot(
-                zone_id=zone_id,
-                occupied_count=occupied_count,
-                updated_at=datetime.utcnow(),
-                source=OccupancySource.CAMERA.value,
-            )
-            db.add(new_snapshot)
-            db.commit()
-            
-            await websocket.send_json({
-                "zone_id": zone_id,
-                "occupied_count": occupied_count,
-                "message": "Processed frame successfully"
-            })
-            
-    except WebSocketDisconnect:
-        print(f"Client disconnected from zone {zone_id} stream.")
 
 
 @router.post(
@@ -160,138 +114,74 @@ async def detect_stream(websocket: WebSocket, zone_id: int, db: Session = Depend
 )
 async def start_camera_stream(
     zone_id: int, 
-    background_tasks: BackgroundTasks, 
+    payload: StartStreamRequest,
+    background_tasks: BackgroundTasks = BackgroundTasks(), 
     db: Session = Depends(get_db)
 ):
     """
-    Start processing an RTSP camera stream in the background.
+    Input a URL (RTSP/HTTP/0) in the Request Body to start background processing.
     """
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
     if not zone:
         raise HTTPException(status_code=404, detail="Zone not found.")
-        
-    rtsp_url = f"rtsp://example.com/live/zone_{zone_id}"
     
-    background_tasks.add_task(VisionService.process_rtsp_stream, rtsp_url, zone_id, db)
+    # Use our database session factory for the background task
+    background_tasks.add_task(VisionService.process_rtsp_stream, payload.url, zone_id, SessionLocal)
     
     return ApiResponse(
-        message=f"Started live processing for zone {zone.name}",
-        data={"rtsp_url": rtsp_url}
+        message=f"Started AI background processing for {zone.name}",
+        data={"url": payload.url, "zone_id": zone_id}
     )
 
-
-@router.post(
-    "/update",
-    response_model=ApiResponse[ZoneOccupancySummary],
-    status_code=status.HTTP_200_OK,
-)
-def update_occupancy(
-    payload: OccupancyUpdateRequest,
-    _: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    """
-    Update occupancy counts for a zone manually or via sensor data.
-    """
-    zone = db.query(Zone).filter(Zone.id == payload.zone_id).first()
+@router.websocket("/ws/detect-stream/{zone_id}")
+async def detect_stream(websocket: WebSocket, zone_id: int, db: Session = Depends(get_db)):
+    await websocket.accept()
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
     if not zone:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Zone not found.",
-        )
+        await websocket.close(code=1008)
+        return
+    try:
+        while True:
+            image_bytes = await websocket.receive_bytes()
+            occupied_count = VisionService.count_vehicles_in_zone(image_bytes)
+            new_snapshot = OccupancySnapshot(
+                zone_id=zone_id,
+                occupied_count=occupied_count,
+                updated_at=datetime.utcnow(),
+                source=OccupancySource.CAMERA.value,
+            )
+            db.add(new_snapshot)
+            db.commit()
+            await websocket.send_json({"zone_id": zone_id, "occupied_count": occupied_count})
+    except WebSocketDisconnect:
+        pass
 
+@router.post("/update", response_model=ApiResponse[ZoneOccupancySummary])
+def update_occupancy(payload: OccupancyUpdateRequest, db: Session = Depends(get_db)):
+    zone = db.query(Zone).filter(Zone.id == payload.zone_id).first()
+    if not zone: raise HTTPException(404, "Zone not found.")
     _validate_occupied_count(zone, payload.occupied_count)
+    new_snapshot = OccupancySnapshot(zone_id=payload.zone_id, occupied_count=payload.occupied_count, source=payload.source.value)
+    db.add(new_snapshot); db.commit(); db.refresh(new_snapshot)
+    return ApiResponse(message="Updated", data=_build_zone_summary(zone, db))
 
-    new_snapshot = OccupancySnapshot(
-        zone_id=payload.zone_id,
-        occupied_count=payload.occupied_count,
-        updated_at=payload.updated_at or datetime.utcnow(),
-        source=payload.source.value,
-    )
-    db.add(new_snapshot)
-    db.commit()
-    db.refresh(new_snapshot)
-
-    return ApiResponse(
-        message="Zone occupancy updated successfully.",
-        data=_build_zone_summary(zone, db),
-    )
-
-
-@router.get(
-    "/zones",
-    response_model=ApiResponse[ZoneOccupancyListResponse],
-    status_code=status.HTTP_200_OK,
-)
+@router.get("/zones", response_model=ApiResponse[ZoneOccupancyListResponse])
 def get_all_zone_occupancy(db: Session = Depends(get_db)):
-    """
-    Return occupancy summary for all zones.
-    """
     zones = db.query(Zone).all()
     items = [_build_zone_summary(zone, db) for zone in zones]
+    return ApiResponse(message="Success", data=ZoneOccupancyListResponse(items=items, total=len(items)))
 
-    return ApiResponse(
-        message="Zone occupancy summaries retrieved successfully.",
-        data=ZoneOccupancyListResponse(items=items, total=len(items)),
-    )
-
-
-@router.get(
-    "/zones/{zone_id}",
-    response_model=ApiResponse[ZoneOccupancySummary],
-    status_code=status.HTTP_200_OK,
-)
+@router.get("/zones/{zone_id}", response_model=ApiResponse[ZoneOccupancySummary])
 def get_zone_occupancy(zone_id: int, db: Session = Depends(get_db)):
-    """
-    Return occupancy summary for one zone.
-    """
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
-    if not zone:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Zone not found.",
-        )
+    if not zone: raise HTTPException(404, "Zone not found.")
+    return ApiResponse(message="Success", data=_build_zone_summary(zone, db))
 
-    return ApiResponse(
-        message="Zone occupancy summary retrieved successfully.",
-        data=_build_zone_summary(zone, db),
-    )
-
-
-@router.patch(
-    "/zones/{zone_id}/manual-adjust",
-    response_model=ApiResponse[ZoneOccupancySummary],
-    status_code=status.HTTP_200_OK,
-)
-def manual_adjust_zone_occupancy(
-    zone_id: int,
-    payload: OccupancyManualAdjustRequest,
-    _: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    """
-    Manually adjust occupied count for a zone.
-    """
+@router.patch("/zones/{zone_id}/manual-adjust", response_model=ApiResponse[ZoneOccupancySummary])
+def manual_adjust_zone_occupancy(zone_id: int, payload: OccupancyManualAdjustRequest, db: Session = Depends(get_db)):
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
-    if not zone:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Zone not found.",
-        )
-
+    if not zone: raise HTTPException(404, "Zone not found.")
     _validate_occupied_count(zone, payload.occupied_count)
-
-    new_snapshot = OccupancySnapshot(
-        zone_id=zone_id,
-        occupied_count=payload.occupied_count,
-        updated_at=payload.updated_at or datetime.utcnow(),
-        source=payload.source.value,
-    )
-    db.add(new_snapshot)
-    db.commit()
-    db.refresh(new_snapshot)
-
-    return ApiResponse(
-        message="Zone occupancy adjusted successfully.",
-        data=_build_zone_summary(zone, db),
-    )
+    new_snapshot = OccupancySnapshot(zone_id=zone_id, occupied_count=payload.occupied_count, source=payload.source.value)
+    db.add(new_snapshot); db.commit(); db.refresh(new_snapshot)
+    return ApiResponse(message="Adjusted", data=_build_zone_summary(zone, db))

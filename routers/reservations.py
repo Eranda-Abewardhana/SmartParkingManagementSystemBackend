@@ -14,13 +14,12 @@ from routers.auth import get_current_user, require_admin
 from schemas.reservations import (
     ApiResponse,
     ReservationCancelRequest,
-    ReservationCreateRequest,
     ReservationDetail,
     ReservationListResponse,
     ReservationRescheduleRequest,
     ReservationStatus,
     ReservationStatusUpdateRequest,
-    ReservationSummary,
+    ReservationSummary, ReservationCreateRequest,
 )
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
@@ -31,12 +30,17 @@ ACTIVE_STATUSES = {
     ReservationStatus.ACTIVE.value,
 }
 
-
 def _to_reservation_summary(reservation: Reservation) -> ReservationSummary:
     return ReservationSummary.model_validate(reservation)
 
 
-def _to_reservation_detail(reservation: Reservation, vehical_no: str = None, username: str = None) -> ReservationDetail:
+def _to_reservation_detail(
+    reservation: Reservation,
+    vehicalNo: Optional[str] = None,
+    username: Optional[str] = None,
+    zone_name: Optional[str] = None,
+    slot_number: Optional[str] = None,
+) -> ReservationDetail:
     return ReservationDetail(
         id=reservation.id,
         start_time=reservation.start_time.strftime("%H:%M:%S") if reservation.start_time else None,
@@ -46,9 +50,11 @@ def _to_reservation_detail(reservation: Reservation, vehical_no: str = None, use
         notes=reservation.notes,
         vehicle_id=reservation.vehicle_id,
         zone_id=reservation.zone_id,
-        vehicalNo=vehical_no,
+        vehicalNo=vehicalNo,
         username=username,
-        reservation_date=reservation.reservation_date.strftime("%Y-%m-%d") if reservation.reservation_date else None
+        zone_name=zone_name,
+        slot_number=reservation.slot_number,
+        reservation_date=reservation.reservation_date.strftime("%Y-%m-%d") if reservation.reservation_date else None,
     )
 
 
@@ -237,8 +243,9 @@ def create_reservation(
         reservation_date=payload.reservation_date,
         start_time=payload.start_time,
         end_time=payload.end_time,
-        status=ReservationStatus.CONFIRMED.value,
+        status=ReservationStatus.PENDING.value,
         notes=payload.notes,
+        slot_number=payload.slot_number
     )
 
     db.add(new_reservation)
@@ -301,27 +308,39 @@ def get_my_reservations(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Return current user's reservations.
-    """
-    query = db.query(Reservation).filter(Reservation.user_id == current_user.id)
+    query = (
+        db.query(Reservation)
+        .join(Vehicle, Reservation.vehicle_id == Vehicle.id)
+        .join(Zone, Reservation.zone_id == Zone.id)
+        .filter(Reservation.user_id == current_user.id)
+    )
 
     if status_filter is not None:
         query = query.filter(Reservation.status == status_filter.value)
 
-    reservations = query.all()
+    results = query.add_columns(
+        Vehicle.plate_number,
+        Zone.name,
+        Reservation.slot_number,
+    ).all()
 
-    data = ReservationListResponse(
-        items=[_to_reservation_summary(reservation) for reservation in reservations],
-        total=len(reservations),
-    )
+    reservation_items = [
+        _to_reservation_detail(
+            reservation,
+            vehicalNo=vehicle_plate,
+            zone_name=zone_name,
+            slot_number=slot_number
+        )
+        for reservation, vehicle_plate, zone_name, slot_number in results
+    ]
 
     return ApiResponse(
         message="User reservations retrieved successfully.",
-        data=data,
+        data=ReservationListResponse(
+            items=reservation_items,
+            total=len(reservation_items),
+        ),
     )
-
-
 @router.get(
     "/{reservation_id}",
     response_model=ApiResponse[ReservationDetail],
@@ -531,3 +550,30 @@ def update_reservation_status(
         message="Reservation status updated successfully.",
         data=_to_reservation_detail(reservation),
     )
+def _expire_past_reservations(db: Session):
+    from datetime import datetime
+
+    now = datetime.now()
+
+    reservations = db.query(Reservation).filter(
+        Reservation.status.in_([
+            ReservationStatus.PENDING.value,
+            ReservationStatus.CONFIRMED.value,
+            ReservationStatus.ACTIVE.value,
+        ])
+    ).all()
+
+    updated = 0
+
+    for r in reservations:
+        if r.reservation_date and r.end_time:
+            end_dt = datetime.combine(r.reservation_date, r.end_time)
+
+            if end_dt <= now:
+                r.status = ReservationStatus.EXPIRED.value
+                updated += 1
+
+    if updated > 0:
+        db.commit()
+
+    print(f"EXPIRED {updated} RESERVATIONS")

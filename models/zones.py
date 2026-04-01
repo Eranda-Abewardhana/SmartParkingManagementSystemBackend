@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text
+from sqlalchemy import Column, Integer, String, Boolean, Text, ForeignKey
 from core.database import Base
 
 class Zone(Base):
@@ -12,3 +12,4 @@ class Zone(Base):
     active = Column(Boolean, default=True)
     blocked = Column(Boolean, default=False)
     description = Column(Text, nullable=True)
+    slot_number = Column(Text, nullable=True)

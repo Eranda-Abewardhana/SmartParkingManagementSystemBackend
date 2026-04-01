@@ -20,7 +20,7 @@ from schemas.lpr import (
     LprDetectionSummary,
     LprReviewStatus,
 )
-from services.vision import VisionService
+from services.vision_ai_service import VisionService
 
 router = APIRouter(prefix="/lpr", tags=["lpr"])
 
