@@ -17,11 +17,12 @@ from models.lpr import LprDetection
 from models.notifications import Notification
 from models.entry_exit_logs import EntryExitLog
 from models.occupancy import OccupancySnapshot
-from models.cameras import Camera  # ✅ ADDED
+from models.cameras import Camera
 
 from schemas.users import UserRole
 from schemas.vehicles import VehicleType
 from schemas.zones import ZoneType
+from schemas.reservations import ReservationStatus
 
 
 def generate_slots(rows=4, cols=4):
@@ -196,7 +197,7 @@ def seed_data():
             db.add_all(zones)
             db.commit()
 
-        # 4. Seed Cameras ✅ ADDED
+        # 4. Seed Cameras
         if db.query(Camera).count() == 0:
             print("Seeding cameras...")
             zones = db.query(Zone).all()
@@ -257,7 +258,14 @@ def seed_data():
             zones = db.query(Zone).all()
 
             reservations = []
-            statuses = ["confirmed", "pending", "completed", "cancelled", "expired"]
+            # Updated statuses based on new enum
+            statuses = [
+                ReservationStatus.PENDING,
+                ReservationStatus.RESERVED,
+                ReservationStatus.OCCUPIED,
+                ReservationStatus.EXPIRED,
+                ReservationStatus.AVAILABLE
+            ]
 
             for i in range(10):
                 zone = zones[i % len(zones)]
@@ -271,7 +279,7 @@ def seed_data():
                     reservation_date=date.today() + timedelta(days=random.randint(-2, 5)),
                     start_time=time(random.randint(7, 10), 0),
                     end_time=time(random.randint(15, 18), 0),
-                    status=statuses[i % len(statuses)],
+                    status=statuses[i % len(statuses)].value,
                     notes=f"Test reservation {i + 1}",
                     slot_number=slot_number,
                 )

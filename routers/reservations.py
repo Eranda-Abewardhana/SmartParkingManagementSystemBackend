@@ -27,7 +27,7 @@ router = APIRouter(prefix="/reservations", tags=["reservations"])
 ACTIVE_STATUSES = {
     ReservationStatus.PENDING.value,
     ReservationStatus.CONFIRMED.value,
-    ReservationStatus.ACTIVE.value,
+    ReservationStatus.AVAILABLE.value,
 }
 
 def _to_reservation_summary(reservation: Reservation) -> ReservationSummary:

@@ -16,13 +16,24 @@ class AdminActionType(str, Enum):
     RESOLVE_UNMATCHED_LPR = "resolve_unmatched_lpr"
 
 
+
 class DashboardSummary(BaseModel):
+    # Zones & capacity
     total_zones: int
     total_capacity: int
     occupied_count: int
     available_count: int
+
+    # Reservations
     active_reservations: int
-    vehicles_inside: int
+    pending_requests: int   # ✅ added
+
+    # Vehicle analytics (TODAY 00:00 → now)
+    vehicles_inside: int    # ✅ today net inside
+    total_entries: int      # ✅ added
+    total_exits: int        # ✅ added
+
+    # Alerts
     unmatched_lpr_count: int
     recent_alert_count: int
 

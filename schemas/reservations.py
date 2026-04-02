@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, datetime
 from enum import Enum
 from typing import Generic, List, Optional, TypeVar
 
@@ -6,13 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ReservationStatus(str, Enum):
-    PENDING = "pending"
     CONFIRMED = "confirmed"
-    ACTIVE = "active"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
+    PENDING = "pending"
+    RESERVED = "reserved"
+    OCCUPIED = "occupied"
+    AVAILABLE = "available"
     EXPIRED = "expired"
-    NO_SHOW = "no_show"
 
 
 class ReservationBase(BaseModel):
@@ -85,6 +84,7 @@ class ReservationSummary(BaseModel):
     status: ReservationStatus
     notes: Optional[str] = None
     slot_number: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -111,6 +111,7 @@ class ReservationDetail(BaseModel):
     zone_name: Optional[str] = None
     reservation_date: Optional[str] = None
     slot_number: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

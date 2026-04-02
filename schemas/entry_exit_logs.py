@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class GateType(str, Enum):
     ENTRY = "entry"
     EXIT = "exit"
+    MONITORING = "monitoring"
 
 
 class EntryExitStatus(str, Enum):
@@ -15,6 +16,7 @@ class EntryExitStatus(str, Enum):
     UNMATCHED = "unmatched"
     MANUAL_OVERRIDE = "manual_override"
     DENIED = "denied"
+    DETECTED = "detected"
 
 
 class EntryExitBase(BaseModel):

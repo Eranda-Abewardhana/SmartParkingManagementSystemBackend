@@ -5,29 +5,25 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="495c8986-8ed5-41f9-bab2-140da60488e9" name="Changes" comment="changes added">
-      <change afterPath="$PROJECT_DIR$/models/cameras.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/models/slots.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/routers/cameras.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/schemas/cameras.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/camera_processor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/streaming_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/vision_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/services/alpr_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/reservations.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/zones.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/zones.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routers/lpr.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/lpr.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routers/occupancy.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/occupancy.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routers/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/admin.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routers/reports.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/reports.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/routers/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/reservations.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/routers/zones.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/zones.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/schemas/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/admin.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/schemas/entry_exit_logs.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/entry_exit_logs.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/schemas/occupancy.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/occupancy.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/schemas/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/reservations.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/schemas/zones.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/zones.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/seed_db.py" beforeDir="false" afterPath="$PROJECT_DIR$/seed_db.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/vision.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/vision_ai_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/camera_processor.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/camera_processor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/streaming_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/streaming_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/vision_ai_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/vision_ai_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/vision_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/vision_service.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -185,6 +181,12 @@
       <workItem from="1775068710743" duration="998000" />
       <workItem from="1775070037000" duration="302000" />
       <workItem from="1775071027821" duration="345000" />
+      <workItem from="1775072032827" duration="323000" />
+      <workItem from="1775072767430" duration="2984000" />
+      <workItem from="1775075919792" duration="1177000" />
+      <workItem from="1775109915861" duration="6303000" />
+      <workItem from="1775116745458" duration="7133000" />
+      <workItem from="1775152576013" duration="5344000" />
     </task>
     <task id="LOCAL-00001" summary="init">
       <option name="closed" value="true" />
@@ -210,7 +212,15 @@
       <option name="project" value="LOCAL" />
       <updated>1774193160736</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="changes added">
+      <option name="closed" value="true" />
+      <created>1775072084946</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1775072084946</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -224,7 +234,7 @@
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$test_db.coverage" NAME="test_db Coverage Results" MODIFIED="1774336098799" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$seed_db.coverage" NAME="seed_db Coverage Results" MODIFIED="1774560586477" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$reset_db.coverage" NAME="reset_db Coverage Results" MODIFIED="1774635814561" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$SmartParkingManagementSystem.coverage" NAME="SmartParkingManagementSystem Coverage Results" MODIFIED="1775071290242" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$reset_db.coverage" NAME="reset_db Coverage Results" MODIFIED="1775125912784" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$SmartParkingManagementSystem.coverage" NAME="SmartParkingManagementSystem Coverage Results" MODIFIED="1775158856869" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>

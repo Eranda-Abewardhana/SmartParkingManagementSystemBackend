@@ -45,4 +45,4 @@ class ZoneOccupancyListResponse(BaseModel):
 
 # NEW SCHEMA FOR STREAMING
 class StartStreamRequest(BaseModel):
-    url: str = Field(..., description="Camera URL (RTSP, HTTP, or 0 for webcam)")
+    url: str = Field(..., description="Camera URL (RTSP, HTTP)")

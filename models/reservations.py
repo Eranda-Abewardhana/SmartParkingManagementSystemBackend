@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Date, Time, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, Time, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from core.database import Base
+from datetime import datetime
 
 class Reservation(Base):
     __tablename__ = "reservations"
@@ -15,6 +16,7 @@ class Reservation(Base):
     end_time = Column(Time, nullable=False)
     status = Column(String, nullable=False) # Store as string from ReservationStatus Enum
     notes = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
     vehicle = relationship("Vehicle")

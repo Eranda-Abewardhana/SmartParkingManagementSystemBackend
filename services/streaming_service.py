@@ -63,10 +63,6 @@ class CameraStreamer:
         self.capture_url = self._resolve_capture_source()
 
     def _resolve_capture_source(self) -> Union[int, str]:
-        if self.url.isdigit():
-            self.source_label = "webcam"
-            return int(self.url)
-
         if os.path.exists(self.url):
             self.source_label = "local_file"
             return self.url
@@ -81,8 +77,6 @@ class CameraStreamer:
         return self.url
 
     def get_capture(self) -> cv2.VideoCapture:
-        if isinstance(self.capture_url, int):
-            return cv2.VideoCapture(self.capture_url)
         return cv2.VideoCapture(self.capture_url, cv2.CAP_FFMPEG)
 
     def _build_info_frame(self, title: str, message: str) -> bytes:

@@ -16,3 +16,7 @@ easyocr
 numpy
 reportlab
 requests
+huggingface-hub
+transformers
+ultralytics
+torch
