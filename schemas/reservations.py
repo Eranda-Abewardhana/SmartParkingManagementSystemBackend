@@ -34,14 +34,13 @@ class ReservationBase(BaseModel):
     @model_validator(mode="after")
     def validate_reservation_date(self):
         from datetime import date as _date
-
         if self.reservation_date < _date.today():
             raise ValueError("reservation_date cannot be in the past.")
         return self
 
 
 class ReservationCreateRequest(ReservationBase):
-    pass
+    user_id: Optional[int] = Field(default=None, ge=1)
 
 
 class ReservationRescheduleRequest(BaseModel):
@@ -59,7 +58,6 @@ class ReservationRescheduleRequest(BaseModel):
     @model_validator(mode="after")
     def validate_reservation_date(self):
         from datetime import date as _date
-
         if self.reservation_date < _date.today():
             raise ValueError("reservation_date cannot be in the past.")
         return self

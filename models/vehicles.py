@@ -17,3 +17,4 @@ class Vehicle(Base):
     is_active = Column(Boolean, default=True)
 
     owner = relationship("User", back_populates="vehicles")
+

@@ -27,6 +27,10 @@ class OccupancyManualAdjustRequest(BaseModel):
     updated_at: Optional[datetime] = None
     source: OccupancySource = OccupancySource.MANUAL
 
+class UnavailableSlots(BaseModel):
+    occupied: List[str] = []
+    reserved: List[str] = []
+
 class ZoneOccupancySummary(BaseModel):
     zone_id: int
     zone_name: str
@@ -38,6 +42,7 @@ class ZoneOccupancySummary(BaseModel):
     source: str
     active: bool
     blocked: bool
+    unavailable_slots: UnavailableSlots = Field(default_factory=UnavailableSlots)
 
 class ZoneOccupancyListResponse(BaseModel):
     items: List[ZoneOccupancySummary]
@@ -45,4 +50,4 @@ class ZoneOccupancyListResponse(BaseModel):
 
 # NEW SCHEMA FOR STREAMING
 class StartStreamRequest(BaseModel):
-    url: str = Field(..., description="Camera URL (RTSP, HTTP)")
+    url: str = Field(..., description="Camera URL (RTSP, HTTP, or 0 for webcam)")

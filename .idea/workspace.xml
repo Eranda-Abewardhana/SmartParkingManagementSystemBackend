@@ -5,25 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="495c8986-8ed5-41f9-bab2-140da60488e9" name="Changes" comment="changes added">
-      <change afterPath="$PROJECT_DIR$/services/alpr_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/reservations.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/vehicles.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/vehicles.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/routers/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/admin.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routers/reports.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/reports.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routers/entry_exit_logs.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/entry_exit_logs.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routers/occupancy.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/occupancy.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/routers/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/reservations.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routers/zones.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/zones.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/schemas/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/admin.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/schemas/entry_exit_logs.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/entry_exit_logs.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routers/vehicles.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/vehicles.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/schemas/occupancy.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/occupancy.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/schemas/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/reservations.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/schemas/vehicles.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/vehicles.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/seed_db.py" beforeDir="false" afterPath="$PROJECT_DIR$/seed_db.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/camera_processor.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/camera_processor.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/streaming_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/streaming_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/vision_ai_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/vision_ai_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/vision_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/vision_service.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,12 +43,12 @@
     &quot;assignee&quot;: &quot;Eranda-Abewardhana&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings">{
-  &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/Eranda-Abewardhana/SmartParkingManagementSystemBackend.git&quot;,
-    &quot;accountId&quot;: &quot;5147d02e-2ac5-4d5d-be84-4af83ed4c872&quot;
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/Eranda-Abewardhana/SmartParkingManagementSystemBackend.git",
+    "accountId": "865b5f65-ffd3-4219-a81a-0ec2503fc8b6"
   }
-}</component>
+}]]></component>
   <component name="McpProjectServerCommands">
     <commands />
     <urls />
@@ -186,7 +178,11 @@
       <workItem from="1775075919792" duration="1177000" />
       <workItem from="1775109915861" duration="6303000" />
       <workItem from="1775116745458" duration="7133000" />
-      <workItem from="1775152576013" duration="5344000" />
+      <workItem from="1775152576013" duration="6084000" />
+      <workItem from="1775211314907" duration="16828000" />
+      <workItem from="1775282661609" duration="10050000" />
+      <workItem from="1775326192922" duration="8703000" />
+      <workItem from="1775416140214" duration="1204000" />
     </task>
     <task id="LOCAL-00001" summary="init">
       <option name="closed" value="true" />
@@ -231,10 +227,21 @@
     <MESSAGE value="changes added" />
     <option name="LAST_COMMIT_MESSAGE" value="changes added" />
   </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/routers/entry_exit_logs.py</url>
+          <line>148</line>
+          <option name="timeStamp" value="6" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$test_db.coverage" NAME="test_db Coverage Results" MODIFIED="1774336098799" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$seed_db.coverage" NAME="seed_db Coverage Results" MODIFIED="1774560586477" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$reset_db.coverage" NAME="reset_db Coverage Results" MODIFIED="1775125912784" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$SmartParkingManagementSystem.coverage" NAME="SmartParkingManagementSystem Coverage Results" MODIFIED="1775158856869" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$seed_db.coverage" NAME="seed_db Coverage Results" MODIFIED="1775329971914" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$reset_db.coverage" NAME="reset_db Coverage Results" MODIFIED="1775329993816" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$SmartParkingManagementSystem.coverage" NAME="SmartParkingManagementSystem Coverage Results" MODIFIED="1775335734273" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>

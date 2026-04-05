@@ -30,6 +30,7 @@ class VehicleBase(BaseModel):
 
 class VehicleCreateRequest(VehicleBase):
     is_primary: bool = False
+    owner_user_id: Optional[int] = None # For admin use
 
 
 class VehicleUpdateRequest(BaseModel):

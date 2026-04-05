@@ -1,4 +1,4 @@
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -24,6 +24,7 @@ from schemas.entry_exit_logs import (
     ExitResponseDetail,
     GateType,
 )
+from schemas.reservations import ReservationStatus
 
 router = APIRouter(prefix="/entry-exit", tags=["entry_exit"])
 
@@ -36,24 +37,61 @@ def _to_log_detail(log: EntryExitLog) -> EntryExitLogDetail:
     return EntryExitLogDetail.model_validate(log)
 
 
-def _active_reservation_for_vehicle(db: Session, vehicle_id: int, at_time: datetime) -> Optional[Reservation]:
+ACTIVE_RESERVATION_STATUSES = [
+    ReservationStatus.CONFIRMED.value,
+    ReservationStatus.RESERVED.value,
+]
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    """
+    Normalize datetime to UTC-aware.
+    - naive -> assume UTC
+    - aware -> convert to UTC
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _reservation_end_datetime(reservation: Reservation) -> datetime:
+    """
+    Build a UTC-aware reservation end datetime.
+    Assumes reservation_date + end_time are stored in UTC business time.
+    """
+    end_dt = datetime.combine(reservation.reservation_date, reservation.end_time)
+    return _ensure_utc(end_dt)
+
+
+def _active_reservation_for_vehicle(
+    db: Session,
+    vehicle_id: int,
+    at_time: datetime
+) -> Optional[Reservation]:
+    at_time = _ensure_utc(at_time)
     current_date = at_time.date()
-    current_time = at_time.time()
-    
-    return db.query(Reservation).filter(
-        Reservation.vehicle_id == vehicle_id,
-        Reservation.status.in_(["pending", "confirmed", "active"]),
-        Reservation.reservation_date == current_date,
-        Reservation.start_time <= current_time,
-        Reservation.end_time >= current_time
-    ).first()
+    current_time = at_time.time().replace(tzinfo=None)
+
+    return (
+        db.query(Reservation)
+        .filter(
+            Reservation.vehicle_id == vehicle_id,
+            Reservation.reservation_date == current_date,
+            Reservation.start_time <= current_time,
+            Reservation.end_time >= current_time,
+        )
+        .first()
+    )
 
 
 def _find_open_entry_log(db: Session, plate_number: str) -> Optional[EntryExitLog]:
     normalized = plate_number.strip().upper()
-    latest_log = db.query(EntryExitLog).filter(
-        EntryExitLog.plate_number == normalized
-    ).order_by(desc(EntryExitLog.timestamp)).first()
+    latest_log = (
+        db.query(EntryExitLog)
+        .filter(EntryExitLog.plate_number == normalized)
+        .order_by(desc(EntryExitLog.timestamp))
+        .first()
+    )
 
     if latest_log and latest_log.gate_type == GateType.ENTRY.value:
         return latest_log
@@ -61,38 +99,23 @@ def _find_open_entry_log(db: Session, plate_number: str) -> Optional[EntryExitLo
 
 
 def _calculate_duration(entry_time: datetime, exit_time: datetime) -> DurationSummary:
+    entry_time = _ensure_utc(entry_time)
+    exit_time = _ensure_utc(exit_time)
+
     delta = exit_time - entry_time
     total_minutes = delta.total_seconds() / 60
-    
+
     hours, remainder = divmod(int(delta.total_seconds()), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    
+    minutes, _seconds = divmod(remainder, 60)
+
     formatted = f"{hours}h {minutes}m"
     if hours == 0:
         formatted = f"{minutes}m"
 
     return DurationSummary(
         total_minutes=round(total_minutes, 2),
-        formatted_duration=formatted
+        formatted_duration=formatted,
     )
-
-
-def _check_overstay(exit_time: datetime, reservation: Optional[Reservation]) -> bool:
-    """
-    Checks if a vehicle has overstayed its reservation.
-    A grace period (e.g., 15 mins) can be added.
-    """
-    if not reservation:
-        return False
-    
-    # Grace period in minutes
-    GRACE_PERIOD = 15
-    
-    # Combine reservation date and end_time into a datetime for comparison
-    end_datetime = datetime.combine(reservation.reservation_date, reservation.end_time)
-    
-    # Overstayed if exit_time is beyond reservation end time + grace period
-    return exit_time > (end_datetime + timedelta(minutes=GRACE_PERIOD))
 
 
 @router.post(
@@ -101,16 +124,17 @@ def _check_overstay(exit_time: datetime, reservation: Optional[Reservation]) -> 
     status_code=status.HTTP_201_CREATED,
 )
 def create_entry_log(payload: EntryLogCreateRequest, db: Session = Depends(get_db)):
-    """
-    Create an entry gate log.
-    """
-    timestamp = payload.timestamp or datetime.utcnow()
+    timestamp = _ensure_utc(payload.timestamp) if payload.timestamp else datetime.now(timezone.utc)
     normalized_plate = payload.plate_number.strip().upper()
 
-    vehicle = db.query(Vehicle).filter(
-        Vehicle.plate_number == normalized_plate,
-        Vehicle.is_active == True
-    ).first()
+    vehicle = (
+        db.query(Vehicle)
+        .filter(
+            Vehicle.plate_number == normalized_plate,
+            Vehicle.is_active.is_(True),
+        )
+        .first()
+    )
 
     matched_vehicle_id = None
     matched_user_id = None
@@ -120,13 +144,20 @@ def create_entry_log(payload: EntryLogCreateRequest, db: Session = Depends(get_d
     if vehicle:
         matched_vehicle_id = vehicle.id
         matched_user_id = vehicle.owner_user_id
+
         reservation = _active_reservation_for_vehicle(db, vehicle.id, timestamp)
         if reservation:
             matched_reservation_id = reservation.id
             log_status = EntryExitStatus.MATCHED.value
-            # Optionally mark reservation as 'active' on entry
-            reservation.status = "active"
+
+            if reservation.status in [
+                ReservationStatus.CONFIRMED.value,
+                ReservationStatus.RESERVED.value,
+            ]:
+                reservation.status = ReservationStatus.OCCUPIED.value
+
             db.commit()
+            db.refresh(reservation)
 
     new_log = EntryExitLog(
         plate_number=normalized_plate,
@@ -139,6 +170,7 @@ def create_entry_log(payload: EntryLogCreateRequest, db: Session = Depends(get_d
         status=log_status,
         notes=payload.notes,
     )
+
     db.add(new_log)
     db.commit()
     db.refresh(new_log)
@@ -158,15 +190,18 @@ def create_exit_log(payload: ExitLogCreateRequest, db: Session = Depends(get_db)
     """
     Create an exit gate log, calculate duration, and check for overstay.
     """
-    from datetime import timedelta # Explicit import for the check
-    timestamp = payload.timestamp or datetime.utcnow()
+    timestamp = _ensure_utc(payload.timestamp) if payload.timestamp else datetime.now(timezone.utc)
     normalized_plate = payload.plate_number.strip().upper()
 
-    vehicle = db.query(Vehicle).filter(
-        Vehicle.plate_number == normalized_plate,
-        Vehicle.is_active == True
-    ).first()
-    
+    vehicle = (
+        db.query(Vehicle)
+        .filter(
+            Vehicle.plate_number == normalized_plate,
+            Vehicle.is_active.is_(True),
+        )
+        .first()
+    )
+
     open_entry = _find_open_entry_log(db, normalized_plate)
 
     matched_vehicle_id = None
@@ -177,27 +212,25 @@ def create_exit_log(payload: ExitLogCreateRequest, db: Session = Depends(get_db)
     entry_summary = None
     is_overstayed = False
 
-    # 1. Handle matching and duration
     if open_entry:
         matched_vehicle_id = open_entry.vehicle_id
         matched_user_id = open_entry.user_id
         matched_reservation_id = open_entry.reservation_id
         log_status = EntryExitStatus.MATCHED.value
+
         duration = _calculate_duration(open_entry.timestamp, timestamp)
         entry_summary = _to_log_summary(open_entry)
 
-    # 2. Check for overstay if there was a reservation
     if matched_reservation_id:
         res = db.query(Reservation).filter(Reservation.id == matched_reservation_id).first()
         if res:
-            # Re-calculating using helper
             GRACE_PERIOD = 15
-            end_dt = datetime.combine(res.reservation_date, res.end_time)
+            end_dt = _reservation_end_datetime(res)
+
             if timestamp > (end_dt + timedelta(minutes=GRACE_PERIOD)):
                 is_overstayed = True
-            
-            # Mark reservation as completed
-            res.status = "completed"
+
+            res.status = ReservationStatus.EXPIRED.value
 
     elif vehicle:
         matched_vehicle_id = vehicle.id
@@ -215,13 +248,17 @@ def create_exit_log(payload: ExitLogCreateRequest, db: Session = Depends(get_db)
         is_overstayed=is_overstayed,
         notes=payload.notes,
     )
-    
+
     if is_overstayed:
         overstay_msg = f"Overstayed detected. Exit time: {timestamp.strftime('%H:%M')}"
         new_log.notes = f"{new_log.notes or ''} | {overstay_msg}".strip(" | ")
 
     db.add(new_log)
     db.commit()
+
+    if matched_reservation_id:
+        db.commit()
+
     db.refresh(new_log)
 
     return ApiResponse(
@@ -229,7 +266,7 @@ def create_exit_log(payload: ExitLogCreateRequest, db: Session = Depends(get_db)
         data=ExitResponseDetail(
             exit_log=_to_log_summary(new_log),
             entry_log=entry_summary,
-            duration=duration
+            duration=duration,
         ),
     )
 
@@ -247,7 +284,7 @@ def list_overstayed_vehicles(
     Admin only. Return all exit logs marked as overstayed.
     """
     logs = db.query(EntryExitLog).filter(EntryExitLog.is_overstayed == True).order_by(desc(EntryExitLog.timestamp)).all()
-    
+
     return ApiResponse(
         message="Overstayed logs retrieved successfully.",
         data=EntryExitLogListResponse(items=[_to_log_summary(l) for l in logs], total=len(logs)),
@@ -347,7 +384,7 @@ def get_current_inside(_: User = Depends(require_admin), db: Session = Depends(g
     status_code=status.HTTP_200_OK,
 )
 def get_entry_exit_log(
-    log_id: int, 
+    log_id: int,
     _: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):

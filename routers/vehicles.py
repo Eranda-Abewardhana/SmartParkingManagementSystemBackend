@@ -63,8 +63,18 @@ def create_vehicle(
     db: Session = Depends(get_db),
 ):
     """
-    Create a vehicle for the current user.
+    Create a vehicle. Admins can specify owner_user_id.
     """
+    # Determine the owner
+    owner_id = current_user.id
+    if payload.owner_user_id is not None:
+        if current_user.role != "admin":
+             raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can specify an owner_user_id.",
+            )
+        owner_id = payload.owner_user_id
+
     existing = db.query(Vehicle).filter(
         Vehicle.plate_number == payload.plate_number.strip().upper(),
         Vehicle.is_active == True
@@ -77,7 +87,7 @@ def create_vehicle(
         )
 
     new_vehicle = Vehicle(
-        owner_user_id=current_user.id,
+        owner_user_id=owner_id,
         plate_number=payload.plate_number.strip().upper(),
         vehicle_type=payload.vehicle_type.value,
         brand=payload.brand,
@@ -92,11 +102,11 @@ def create_vehicle(
     db.refresh(new_vehicle)
 
     if payload.is_primary:
-        _set_primary_vehicle_for_user(db, current_user.id, new_vehicle.id)
+        _set_primary_vehicle_for_user(db, owner_id, new_vehicle.id)
     else:
         # If this is the only active vehicle, make it primary
         count = db.query(Vehicle).filter(
-            Vehicle.owner_user_id == current_user.id,
+            Vehicle.owner_user_id == owner_id,
             Vehicle.is_active == True
         ).count()
         if count == 1:
