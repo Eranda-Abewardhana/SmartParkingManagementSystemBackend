@@ -346,7 +346,7 @@ def seed_data():
             vehicle_seed = {
                 "nuwan.perera@uoc.edu": [
                     {
-                        "plate_number": "CAB-4587",
+                        "plate_number": "CAB4587",
                         "vehicle_type": VehicleType.CAR.value,
                         "brand": "Toyota",
                         "model": "Corolla",
@@ -356,7 +356,7 @@ def seed_data():
                 ],
                 "kavindi.silva@uoc.edu": [
                     {
-                        "plate_number": "BJR-9124",
+                        "plate_number": "BJR9124",
                         "vehicle_type": VehicleType.BIKE.value,
                         "brand": "Honda",
                         "model": "CBR",
@@ -366,7 +366,7 @@ def seed_data():
                 ],
                 "tharindu.fernando@uoc.edu": [
                     {
-                        "plate_number": "CAX-6721",
+                        "plate_number": "CAX6721",
                         "vehicle_type": VehicleType.CAR.value,
                         "brand": "Suzuki",
                         "model": "Alto",
@@ -386,7 +386,7 @@ def seed_data():
                 ],
                 "asanka.wijeratne@uoc.edu": [
                     {
-                        "plate_number": "CAA-7789",
+                        "plate_number": "CAA7789",
                         "vehicle_type": VehicleType.CAR.value,
                         "brand": "Honda",
                         "model": "Vezel",
@@ -396,7 +396,7 @@ def seed_data():
                 ],
                 "malini.dealwis@uoc.edu": [
                     {
-                        "plate_number": "CAR-5501",
+                        "plate_number": "CAR5501",
                         "vehicle_type": VehicleType.CAR.value,
                         "brand": "Toyota",
                         "model": "Aqua",
@@ -406,7 +406,7 @@ def seed_data():
                 ],
                 "ravi.gunasekara@uoc.edu": [
                     {
-                        "plate_number": "NC-9921",
+                        "plate_number": "NC9921",
                         "vehicle_type": VehicleType.VAN.value,
                         "brand": "Nissan",
                         "model": "Vanette",
@@ -416,7 +416,7 @@ def seed_data():
                 ],
                 "saman.kumara.visitor@uoc.edu": [
                     {
-                        "plate_number": "PB-7844",
+                        "plate_number": "PB7844",
                         "vehicle_type": VehicleType.CAR.value,
                         "brand": "Perodua",
                         "model": "Axia",
@@ -480,7 +480,7 @@ def seed_data():
             reservation_seed = [
                 {
                     "email": "nuwan.perera@uoc.edu",
-                    "plate": "CAB-4587",
+                    "plate": "CAB4587",
                     "zone_code": "ST-A",
                     "slot": "A1",
                     "day_offset": 0,
@@ -491,7 +491,7 @@ def seed_data():
                 },
                 {
                     "email": "kavindi.silva@uoc.edu",
-                    "plate": "BJR-9124",
+                    "plate": "BJR9124",
                     "zone_code": "ST-B",
                     "slot": "A2",
                     "day_offset": 0,
@@ -502,7 +502,7 @@ def seed_data():
                 },
                 {
                     "email": "tharindu.fernando@uoc.edu",
-                    "plate": "CAX-6721",
+                    "plate": "CAX6721",
                     "zone_code": "ST-A",
                     "slot": "A3",
                     "day_offset": 1,
@@ -524,7 +524,7 @@ def seed_data():
                 },
                 {
                     "email": "asanka.wijeratne@uoc.edu",
-                    "plate": "CAA-7789",
+                    "plate": "CAA7789",
                     "zone_code": "SF-A",
                     "slot": "A1",
                     "day_offset": 0,
@@ -535,7 +535,7 @@ def seed_data():
                 },
                 {
                     "email": "malini.dealwis@uoc.edu",
-                    "plate": "CAR-5501",
+                    "plate": "CAR5501",
                     "zone_code": "VIP-1",
                     "slot": "A1",
                     "day_offset": 0,
@@ -546,7 +546,7 @@ def seed_data():
                 },
                 {
                     "email": "ravi.gunasekara@uoc.edu",
-                    "plate": "NC-9921",
+                    "plate": "NC9921",
                     "zone_code": "SF-A",
                     "slot": "A2",
                     "day_offset": -1,
@@ -557,7 +557,7 @@ def seed_data():
                 },
                 {
                     "email": "saman.kumara.visitor@uoc.edu",
-                    "plate": "PB-7844",
+                    "plate": "PB7844",
                     "zone_code": "VS-A",
                     "slot": "A1",
                     "day_offset": 0,
@@ -612,11 +612,11 @@ def seed_data():
 
             logs = [
                 EntryExitLog(
-                    plate_number="CAB-4587",
-                    vehicle_id=vehicle_by_plate["CAB-4587"].id,
-                    user_id=vehicle_by_plate["CAB-4587"].owner_user_id,
+                    plate_number="CAB4587",
+                    vehicle_id=vehicle_by_plate["CAB4587"].id,
+                    user_id=vehicle_by_plate["CAB4587"].owner_user_id,
                     reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["CAB-4587"].id),
+                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["CAB4587"].id),
                         None
                     ),
                     gate_type="entry",
@@ -627,11 +627,11 @@ def seed_data():
                     notes="Student vehicle entered successfully.",
                 ),
                 EntryExitLog(
-                    plate_number="CAA-7789",
-                    vehicle_id=vehicle_by_plate["CAA-7789"].id,
-                    user_id=vehicle_by_plate["CAA-7789"].owner_user_id,
+                    plate_number="CAA7789",
+                    vehicle_id=vehicle_by_plate["CAA7789"].id,
+                    user_id=vehicle_by_plate["CAA7789"].owner_user_id,
                     reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["CAA-7789"].id),
+                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["CAA7789"].id),
                         None
                     ),
                     gate_type="entry",
@@ -642,11 +642,11 @@ def seed_data():
                     notes="Staff vehicle entered with valid reservation.",
                 ),
                 EntryExitLog(
-                    plate_number="PB-7844",
-                    vehicle_id=vehicle_by_plate["PB-7844"].id,
-                    user_id=vehicle_by_plate["PB-7844"].owner_user_id,
+                    plate_number="PB7844",
+                    vehicle_id=vehicle_by_plate["PB7844"].id,
+                    user_id=vehicle_by_plate["PB7844"].owner_user_id,
                     reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["PB-7844"].id),
+                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["PB7844"].id),
                         None
                     ),
                     gate_type="entry",
@@ -657,11 +657,11 @@ def seed_data():
                     notes="Visitor entered for scheduled meeting.",
                 ),
                 EntryExitLog(
-                    plate_number="BJR-9124",
-                    vehicle_id=vehicle_by_plate["BJR-9124"].id,
-                    user_id=vehicle_by_plate["BJR-9124"].owner_user_id,
+                    plate_number="BJR9124",
+                    vehicle_id=vehicle_by_plate["BJR9124"].id,
+                    user_id=vehicle_by_plate["BJR9124"].owner_user_id,
                     reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["BJR-9124"].id),
+                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["BJR9124"].id),
                         None
                     ),
                     gate_type="entry",
@@ -672,7 +672,7 @@ def seed_data():
                     notes="Bike entered with active reservation.",
                 ),
                 EntryExitLog(
-                    plate_number="XYZ-0000",
+                    plate_number="XYZ0000",
                     vehicle_id=None,
                     user_id=None,
                     reservation_id=None,
@@ -684,11 +684,11 @@ def seed_data():
                     notes="Unknown plate detected at entry.",
                 ),
                 EntryExitLog(
-                    plate_number="NC-9921",
-                    vehicle_id=vehicle_by_plate["NC-9921"].id,
-                    user_id=vehicle_by_plate["NC-9921"].owner_user_id,
+                    plate_number="NC9921",
+                    vehicle_id=vehicle_by_plate["NC9921"].id,
+                    user_id=vehicle_by_plate["NC9921"].owner_user_id,
                     reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["NC-9921"].id),
+                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["NC9921"].id),
                         None
                     ),
                     gate_type="exit",
@@ -710,35 +710,35 @@ def seed_data():
             print("Seeding LPR detections...")
             detections = [
                 LprDetection(
-                    detected_plate="CAB-4587",
+                    detected_plate="CAB4587",
                     confidence=0.98,
                     source_camera="Entrance Gate Camera",
                     detected_at=datetime.now() - timedelta(minutes=15),
                     review_status="approved",
                 ),
                 LprDetection(
-                    detected_plate="CAA-7789",
+                    detected_plate="CAA7789",
                     confidence=0.97,
                     source_camera="Staff Zone Camera",
                     detected_at=datetime.now() - timedelta(minutes=18),
                     review_status="approved",
                 ),
                 LprDetection(
-                    detected_plate="PB-7844",
+                    detected_plate="PB7844",
                     confidence=0.94,
                     source_camera="Visitor Zone Camera",
                     detected_at=datetime.now() - timedelta(minutes=25),
                     review_status="pending",
                 ),
                 LprDetection(
-                    detected_plate="BJR-9124",
+                    detected_plate="BJR9124",
                     confidence=0.91,
                     source_camera="Student Zone B Camera",
                     detected_at=datetime.now() - timedelta(minutes=9),
                     review_status="pending",
                 ),
                 LprDetection(
-                    detected_plate="XYZ-0000",
+                    detected_plate="XYZ0000",
                     confidence=0.86,
                     source_camera="Entrance Gate Camera",
                     detected_at=datetime.now() - timedelta(minutes=5),

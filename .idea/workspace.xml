@@ -5,17 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="495c8986-8ed5-41f9-bab2-140da60488e9" name="Changes" comment="changes added">
+      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/models/vehicles.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/vehicles.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routers/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/admin.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routers/entry_exit_logs.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/entry_exit_logs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routers/occupancy.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/occupancy.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routers/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/reservations.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routers/vehicles.py" beforeDir="false" afterPath="$PROJECT_DIR$/routers/vehicles.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/schemas/occupancy.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/occupancy.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/schemas/reservations.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/reservations.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/schemas/vehicles.py" beforeDir="false" afterPath="$PROJECT_DIR$/schemas/vehicles.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/seed_db.py" beforeDir="false" afterPath="$PROJECT_DIR$/seed_db.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/vision_ai_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/vision_ai_service.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -182,7 +176,10 @@
       <workItem from="1775211314907" duration="16828000" />
       <workItem from="1775282661609" duration="10050000" />
       <workItem from="1775326192922" duration="8703000" />
-      <workItem from="1775416140214" duration="1204000" />
+      <workItem from="1775416140214" duration="3113000" />
+      <workItem from="1775421610767" duration="1859000" />
+      <workItem from="1775489729316" duration="6085000" />
+      <workItem from="1775545008030" duration="409000" />
     </task>
     <task id="LOCAL-00001" summary="init">
       <option name="closed" value="true" />
@@ -216,7 +213,15 @@
       <option name="project" value="LOCAL" />
       <updated>1775072084946</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="changes added">
+      <option name="closed" value="true" />
+      <created>1775419327716</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1775419327716</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -232,7 +237,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/routers/entry_exit_logs.py</url>
-          <line>148</line>
+          <line>153</line>
           <option name="timeStamp" value="6" />
         </line-breakpoint>
       </breakpoints>
@@ -241,7 +246,7 @@
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$test_db.coverage" NAME="test_db Coverage Results" MODIFIED="1774336098799" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$seed_db.coverage" NAME="seed_db Coverage Results" MODIFIED="1775329971914" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$reset_db.coverage" NAME="reset_db Coverage Results" MODIFIED="1775329993816" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$SmartParkingManagementSystem.coverage" NAME="SmartParkingManagementSystem Coverage Results" MODIFIED="1775335734273" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$reset_db.coverage" NAME="reset_db Coverage Results" MODIFIED="1775507910516" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SmartParkingManagementSystem$SmartParkingManagementSystem.coverage" NAME="SmartParkingManagementSystem Coverage Results" MODIFIED="1775545048137" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>
