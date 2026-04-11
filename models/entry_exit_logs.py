@@ -16,3 +16,4 @@ class EntryExitLog(Base):
     status = Column(String(50), nullable=False)
     is_overstayed = Column(Boolean, default=False)
     notes = Column(String(255), nullable=True)
+    matched_entry_log_id = Column(Integer, ForeignKey("entry_exit_logs.id"), nullable=True)

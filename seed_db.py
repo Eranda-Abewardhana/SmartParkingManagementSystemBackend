@@ -606,103 +606,142 @@ def seed_data():
             print("Seeding entry/exit logs...")
 
             now = datetime.now()
-            reservation_by_vehicle = {}
-            for r in reservations:
-                reservation_by_vehicle.setdefault(r.vehicle_id, []).append(r)
 
-            logs = [
-                EntryExitLog(
-                    plate_number="CAB4587",
-                    vehicle_id=vehicle_by_plate["CAB4587"].id,
-                    user_id=vehicle_by_plate["CAB4587"].owner_user_id,
-                    reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["CAB4587"].id),
-                        None
-                    ),
-                    gate_type="entry",
-                    timestamp=now - timedelta(hours=3, minutes=20),
-                    source="Entrance Gate Camera",
-                    status="matched",
-                    is_overstayed=False,
-                    notes="Student vehicle entered successfully.",
-                ),
-                EntryExitLog(
-                    plate_number="CAA7789",
-                    vehicle_id=vehicle_by_plate["CAA7789"].id,
-                    user_id=vehicle_by_plate["CAA7789"].owner_user_id,
-                    reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["CAA7789"].id),
-                        None
-                    ),
-                    gate_type="entry",
-                    timestamp=now - timedelta(hours=2, minutes=40),
-                    source="Staff Zone Camera",
-                    status="matched",
-                    is_overstayed=False,
-                    notes="Staff vehicle entered with valid reservation.",
-                ),
-                EntryExitLog(
-                    plate_number="PB7844",
-                    vehicle_id=vehicle_by_plate["PB7844"].id,
-                    user_id=vehicle_by_plate["PB7844"].owner_user_id,
-                    reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["PB7844"].id),
-                        None
-                    ),
-                    gate_type="entry",
-                    timestamp=now - timedelta(hours=1, minutes=15),
-                    source="Visitor Zone Camera",
-                    status="matched",
-                    is_overstayed=False,
-                    notes="Visitor entered for scheduled meeting.",
-                ),
-                EntryExitLog(
-                    plate_number="BJR9124",
-                    vehicle_id=vehicle_by_plate["BJR9124"].id,
-                    user_id=vehicle_by_plate["BJR9124"].owner_user_id,
-                    reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["BJR9124"].id),
-                        None
-                    ),
-                    gate_type="entry",
-                    timestamp=now - timedelta(minutes=55),
-                    source="Student Zone B Camera",
-                    status="matched",
-                    is_overstayed=False,
-                    notes="Bike entered with active reservation.",
-                ),
-                EntryExitLog(
-                    plate_number="XYZ0000",
-                    vehicle_id=None,
-                    user_id=None,
-                    reservation_id=None,
-                    gate_type="entry",
-                    timestamp=now - timedelta(minutes=30),
-                    source="Entrance Gate Camera",
-                    status="unmatched",
-                    is_overstayed=False,
-                    notes="Unknown plate detected at entry.",
-                ),
-                EntryExitLog(
-                    plate_number="NC9921",
-                    vehicle_id=vehicle_by_plate["NC9921"].id,
-                    user_id=vehicle_by_plate["NC9921"].owner_user_id,
-                    reservation_id=next(
-                        (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["NC9921"].id),
-                        None
-                    ),
-                    gate_type="exit",
-                    timestamp=now - timedelta(hours=18),
-                    source="Staff Zone Camera",
-                    status="matched",
-                    is_overstayed=False,
-                    notes="Vehicle exited after yesterday reservation.",
-                ),
+            cab4587_reservation_id = next(
+                (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["CAB4587"].id),
+                None
+            )
+            caa7789_reservation_id = next(
+                (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["CAA7789"].id),
+                None
+            )
+            pb7844_reservation_id = next(
+                (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["PB7844"].id),
+                None
+            )
+            bjr9124_reservation_id = next(
+                (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["BJR9124"].id),
+                None
+            )
+            nc9921_reservation_id = next(
+                (r.id for r in reservations if r.vehicle_id == vehicle_by_plate["NC9921"].id),
+                None
+            )
+
+            # Entry logs first
+            cab4587_entry = EntryExitLog(
+                plate_number="CAB4587",
+                vehicle_id=vehicle_by_plate["CAB4587"].id,
+                user_id=vehicle_by_plate["CAB4587"].owner_user_id,
+                reservation_id=cab4587_reservation_id,
+                gate_type="entry",
+                timestamp=now - timedelta(hours=3, minutes=20),
+                source="Entrance Gate Camera",
+                status="matched",
+                is_overstayed=False,
+                notes="Student vehicle entered successfully.",
+                matched_entry_log_id=None,
+            )
+
+            caa7789_entry = EntryExitLog(
+                plate_number="CAA7789",
+                vehicle_id=vehicle_by_plate["CAA7789"].id,
+                user_id=vehicle_by_plate["CAA7789"].owner_user_id,
+                reservation_id=caa7789_reservation_id,
+                gate_type="entry",
+                timestamp=now - timedelta(hours=2, minutes=40),
+                source="Staff Zone Camera",
+                status="matched",
+                is_overstayed=False,
+                notes="Staff vehicle entered with valid reservation.",
+                matched_entry_log_id=None,
+            )
+
+            pb7844_entry = EntryExitLog(
+                plate_number="PB7844",
+                vehicle_id=vehicle_by_plate["PB7844"].id,
+                user_id=vehicle_by_plate["PB7844"].owner_user_id,
+                reservation_id=pb7844_reservation_id,
+                gate_type="entry",
+                timestamp=now - timedelta(hours=1, minutes=15),
+                source="Visitor Zone Camera",
+                status="matched",
+                is_overstayed=False,
+                notes="Visitor entered for scheduled meeting.",
+                matched_entry_log_id=None,
+            )
+
+            bjr9124_entry = EntryExitLog(
+                plate_number="BJR9124",
+                vehicle_id=vehicle_by_plate["BJR9124"].id,
+                user_id=vehicle_by_plate["BJR9124"].owner_user_id,
+                reservation_id=bjr9124_reservation_id,
+                gate_type="entry",
+                timestamp=now - timedelta(minutes=55),
+                source="Student Zone B Camera",
+                status="matched",
+                is_overstayed=False,
+                notes="Bike entered with active reservation.",
+                matched_entry_log_id=None,
+            )
+
+            xyz0000_entry = EntryExitLog(
+                plate_number="XYZ0000",
+                vehicle_id=None,
+                user_id=None,
+                reservation_id=None,
+                gate_type="entry",
+                timestamp=now - timedelta(minutes=30),
+                source="Entrance Gate Camera",
+                status="unmatched",
+                is_overstayed=False,
+                notes="Unknown plate detected at entry.",
+                matched_entry_log_id=None,
+            )
+
+            nc9921_entry = EntryExitLog(
+                plate_number="NC9921",
+                vehicle_id=vehicle_by_plate["NC9921"].id,
+                user_id=vehicle_by_plate["NC9921"].owner_user_id,
+                reservation_id=nc9921_reservation_id,
+                gate_type="entry",
+                timestamp=now - timedelta(hours=20),
+                source="Staff Zone Camera",
+                status="matched",
+                is_overstayed=False,
+                notes="Vehicle entered for yesterday reservation.",
+                matched_entry_log_id=None,
+            )
+
+            entry_logs = [
+                cab4587_entry,
+                caa7789_entry,
+                pb7844_entry,
+                bjr9124_entry,
+                xyz0000_entry,
+                nc9921_entry,
             ]
 
-            db.add_all(logs)
-            db.commit()
+            db.add_all(entry_logs)
+            db.flush()
 
+            # Exit logs after entry IDs exist
+            nc9921_exit = EntryExitLog(
+                plate_number="NC9921",
+                vehicle_id=vehicle_by_plate["NC9921"].id,
+                user_id=vehicle_by_plate["NC9921"].owner_user_id,
+                reservation_id=nc9921_reservation_id,
+                gate_type="exit",
+                timestamp=now - timedelta(hours=18),
+                source="Staff Zone Camera",
+                status="matched",
+                is_overstayed=False,
+                notes="Vehicle exited after yesterday reservation.",
+                matched_entry_log_id=nc9921_entry.id,
+            )
+
+            db.add(nc9921_exit)
+            db.commit()
         # =========================================================
         # 9. LPR DETECTIONS
         # =========================================================

@@ -17,12 +17,12 @@ from schemas.entry_exit_logs import (
     DurationSummary,
     EntryExitLogDetail,
     EntryExitLogListResponse,
-    EntryExitLogSummary,
     EntryExitStatus,
     EntryLogCreateRequest,
     ExitLogCreateRequest,
     ExitResponseDetail,
     GateType,
+    EntryExitLogSummary
 )
 from schemas.reservations import ReservationStatus
 
@@ -79,22 +79,63 @@ def _active_reservation_for_vehicle(
             Reservation.reservation_date == current_date,
             Reservation.start_time <= current_time,
             Reservation.end_time >= current_time,
+            Reservation.status.in_(["pending", "confirmed", "active", "reserved", "checked_in"])
         )
+        .order_by(Reservation.start_time.asc())
         .first()
     )
 
 
 def _find_open_entry_log(db: Session, plate_number: str) -> Optional[EntryExitLog]:
     normalized = plate_number.strip().upper()
-    latest_log = (
+    
+    # First check if the vehicle has an active reservation
+    vehicle = db.query(Vehicle).filter(Vehicle.plate_number == normalized).first()
+    if vehicle:
+        reservation = _active_reservation_for_vehicle(db, vehicle.id, datetime.now(timezone.utc))
+        if reservation:
+            # Check if there is already an open entry log for this reservation
+            entry_log = db.query(EntryExitLog).filter(
+                EntryExitLog.reservation_id == reservation.id,
+                EntryExitLog.gate_type == GateType.ENTRY.value
+            ).order_by(desc(EntryExitLog.timestamp)).first()
+
+            if entry_log:
+                exit_match = (
+                    db.query(EntryExitLog)
+                    .filter(
+                        EntryExitLog.gate_type == GateType.EXIT.value,
+                        EntryExitLog.matched_entry_log_id == entry_log.id
+                    )
+                    .first()
+                )
+                if not exit_match:
+                    return entry_log
+
+    # Fallback to checking by plate number if no reservation logic applies
+    entry_logs = (
         db.query(EntryExitLog)
-        .filter(EntryExitLog.plate_number == normalized)
+        .filter(
+            EntryExitLog.plate_number == normalized,
+            EntryExitLog.gate_type == GateType.ENTRY.value
+        )
         .order_by(desc(EntryExitLog.timestamp))
-        .first()
+        .all()
     )
 
-    if latest_log and latest_log.gate_type == GateType.ENTRY.value:
-        return latest_log
+    # Return the first entry log that doesn't have a matching exit log
+    for entry in entry_logs:
+        exit_match = (
+            db.query(EntryExitLog)
+            .filter(
+                EntryExitLog.gate_type == GateType.EXIT.value,
+                EntryExitLog.matched_entry_log_id == entry.id
+            )
+            .first()
+        )
+        if not exit_match:
+            return entry
+            
     return None
 
 
@@ -165,7 +206,7 @@ def create_entry_log(payload: EntryLogCreateRequest, db: Session = Depends(get_d
         user_id=matched_user_id,
         reservation_id=matched_reservation_id,
         gate_type=GateType.ENTRY.value,
-        timestamp=timestamp,
+        timestamp=timestamp.replace(tzinfo=None),
         source=payload.source,
         status=log_status,
         notes=payload.notes,
@@ -207,6 +248,7 @@ def create_exit_log(payload: ExitLogCreateRequest, db: Session = Depends(get_db)
     matched_vehicle_id = None
     matched_user_id = None
     matched_reservation_id = None
+    matched_entry_log_id = None
     log_status = EntryExitStatus.UNMATCHED.value
     duration = None
     entry_summary = None
@@ -216,6 +258,7 @@ def create_exit_log(payload: ExitLogCreateRequest, db: Session = Depends(get_db)
         matched_vehicle_id = open_entry.vehicle_id
         matched_user_id = open_entry.user_id
         matched_reservation_id = open_entry.reservation_id
+        matched_entry_log_id = open_entry.id
         log_status = EntryExitStatus.MATCHED.value
 
         duration = _calculate_duration(open_entry.timestamp, timestamp)
@@ -242,11 +285,12 @@ def create_exit_log(payload: ExitLogCreateRequest, db: Session = Depends(get_db)
         user_id=matched_user_id,
         reservation_id=matched_reservation_id,
         gate_type=GateType.EXIT.value,
-        timestamp=timestamp,
+        timestamp=timestamp.replace(tzinfo=None),
         source=payload.source,
         status=log_status,
         is_overstayed=is_overstayed,
         notes=payload.notes,
+        matched_entry_log_id=matched_entry_log_id
     )
 
     if is_overstayed:
@@ -320,10 +364,10 @@ def list_entry_exit_logs(
         query = query.filter(EntryExitLog.status == status_filter.value)
 
     if date_from is not None:
-        query = query.filter(EntryExitLog.timestamp >= date_from)
+        query = query.filter(EntryExitLog.timestamp >= date_from.replace(tzinfo=None))
 
     if date_to is not None:
-        query = query.filter(EntryExitLog.timestamp <= date_to)
+        query = query.filter(EntryExitLog.timestamp <= date_to.replace(tzinfo=None))
 
     total = query.count()
     logs = query.order_by(desc(EntryExitLog.timestamp)).all()

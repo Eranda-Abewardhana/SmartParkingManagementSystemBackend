@@ -8,15 +8,24 @@ import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from collections import Counter
+from datetime import datetime, timedelta
 
 import torch
 import easyocr
 from dotenv import load_dotenv
 from ultralytics import YOLO
+from sqlalchemy.orm import Session
+
+from models.cameras import Camera
+from models.vehicles import Vehicle
+from models.entry_exit_logs import EntryExitLog
+from models.reservations import Reservation
+from schemas.reservations import ReservationStatus
 
 load_dotenv()
 
 latest_frames: Dict[int, bytes] = {}
+latest_results: Dict[int, Dict[str, Any]] = {}
 
 
 @dataclass
@@ -38,6 +47,8 @@ class TrackState:
     last_ocr_ts: float = 0.0
     last_ocr_area: int = 0
 
+    logged_to_db: bool = False
+
 
 class VisionService:
     _plate_detector = None
@@ -50,19 +61,16 @@ class VisionService:
     _last_init_attempt_ts = 0.0
     _retry_after_sec = float(os.getenv("PLATE_MODEL_RETRY_SEC", "15"))
 
-    # Main local path
     PLATE_DETECTOR_MODEL = os.getenv(
         "PLATE_DETECTOR_MODEL",
         "/home/eranda/PycharmProjects/SmartParkingManagementSystem/models/license_plate_detector.pt"
     )
 
-    # Fallback download location
     PLATE_DETECTOR_CACHE = os.getenv(
         "PLATE_DETECTOR_CACHE",
         "/home/eranda/PycharmProjects/SmartParkingManagementSystem/models/downloaded_license_plate_detector.pt"
     )
 
-    # Public fallback weight
     PLATE_DETECTOR_FALLBACK_URL = os.getenv(
         "PLATE_DETECTOR_FALLBACK_URL",
         "https://raw.githubusercontent.com/Muhammad-Zeerak-Khan/Automatic-License-Plate-Recognition-using-YOLOv8/main/license_plate_detector.pt"
@@ -85,7 +93,7 @@ class VisionService:
 
     TRACK_TTL_SEC = float(os.getenv("PLATE_TRACK_TTL_SEC", "3.0"))
     IOU_MATCH_THRESHOLD = float(os.getenv("PLATE_IOU_MATCH_THRESHOLD", "0.30"))
-    RECENT_PLATE_COOLDOWN_SEC = float(os.getenv("PLATE_RECENT_COOLDOWN_SEC", "2.0"))
+    RECENT_PLATE_COOLDOWN_SEC = float(os.getenv("PLATE_RECENT_COOLDOWN_SEC", "20.0"))
 
     MIN_PLATE_LEN = int(os.getenv("PLATE_MIN_LEN", "4"))
     MAX_PLATE_LEN = int(os.getenv("PLATE_MAX_LEN", "12"))
@@ -109,15 +117,12 @@ class VisionService:
 
     @classmethod
     def _resolve_detector_model_path(cls) -> str:
-        # 1) explicit local path
         if cls.PLATE_DETECTOR_MODEL and os.path.exists(cls.PLATE_DETECTOR_MODEL):
             return cls.PLATE_DETECTOR_MODEL
 
-        # 2) cached downloaded path
         if cls.PLATE_DETECTOR_CACHE and os.path.exists(cls.PLATE_DETECTOR_CACHE):
             return cls.PLATE_DETECTOR_CACHE
 
-        # 3) fallback download
         return cls._download_fallback_model(cls.PLATE_DETECTOR_CACHE)
 
     @classmethod
@@ -176,7 +181,6 @@ class VisionService:
         if len(text) < VisionService.MIN_PLATE_LEN or len(text) > VisionService.MAX_PLATE_LEN:
             return None
 
-        # Reject bad OCR garbage
         if len(set(text)) == 1:
             return None
 
@@ -436,10 +440,7 @@ class VisionService:
                 matched.last_ocr_area = area
 
                 if text:
-                    print(
-                        f"[ALPR-RAW] Cam {cam_id} | Track {matched.track_id} | OCR {text}",
-                        flush=True
-                    )
+                    print(f"[ALPR-RAW] Cam {cam_id} | Track {matched.track_id} | OCR {text}", flush=True)
 
                     cls._update_consensus(matched, text)
 
@@ -452,6 +453,7 @@ class VisionService:
                                 flush=True
                             )
                             cls._recent_plate_logs[dedupe_key] = now
+                            matched.logged_to_db = False
 
             outputs.append({
                 "track_id": matched.track_id,
@@ -466,6 +468,7 @@ class VisionService:
                 "y": y1,
                 "w": x2 - x1,
                 "h": y2 - y1,
+                "should_log": matched.is_confirmed and not matched.logged_to_db
             })
 
         cls._cleanup_tracks(cam_id, now)
@@ -500,8 +503,226 @@ class VisionService:
         return out
 
 
+def _normalize_plate(plate: str) -> str:
+    return re.sub(r"[^A-Z0-9]", "", (plate or "").upper().strip())
+
+
+def _detect_gate_type(camera: Camera) -> Optional[str]:
+    if not camera or not camera.name:
+        return None
+
+    cam_name = camera.name.lower()
+
+    if "entrance" in cam_name or "entry" in cam_name:
+        return "entry"
+
+    if "exit" in cam_name:
+        return "exit"
+
+    return None
+
+
+def _find_vehicle(db: Session, plate: str) -> Optional[Vehicle]:
+    normalized = _normalize_plate(plate)
+    return db.query(Vehicle).filter(Vehicle.plate_number == normalized).first()
+
+
+def _find_matching_reservation(db: Session, vehicle_id: int, now_dt: datetime) -> Optional[Reservation]:
+    if not vehicle_id:
+        return None
+
+    current_date = now_dt.date()
+    current_time = now_dt.time()
+
+    return db.query(Reservation).filter(
+        Reservation.vehicle_id == vehicle_id,
+        Reservation.reservation_date == current_date,
+        Reservation.start_time <= current_time,
+        Reservation.end_time >= current_time,
+        Reservation.status.in_(["pending", "confirmed", "active", "reserved", "checked_in"])
+    ).order_by(Reservation.start_time.asc()).first()
+
+def _find_open_entry_log(
+    db: Session,
+    plate: str,
+    at_time: Optional[datetime] = None,
+) -> List[Reservation]:
+    """
+    Find all valid reservations for a vehicle at the given time.
+    """
+    # normalized = _normalize_plate(plate)
+    check_time = at_time or datetime.utcnow()
+
+    current_date = check_time.date()
+    current_time = check_time.time()
+
+    print(f"[ENTRY-CHECK] plate={plate} date={current_date} time={current_time}")
+
+    reservations = (
+        db.query(Reservation)
+        .join(Vehicle, Reservation.vehicle_id == Vehicle.id)
+        .filter(
+            Vehicle.plate_number == plate,
+            # Reservation.reservation_date == current_date,
+            # Reservation.start_time <= current_time,
+            # Reservation.end_time >= current_time,
+            Reservation.status.in_([
+                ReservationStatus.RESERVED.value,
+            ]),
+        )
+        .order_by(Reservation.start_time.asc())
+        .first()
+    )
+
+    return reservations
+
+def _recent_same_gate_log_exists(
+    db: Session,
+    plate: str,
+    gate_type: str,
+    within_seconds: int = 15
+) -> bool:
+    normalized = _normalize_plate(plate)
+    threshold = datetime.utcnow() - timedelta(seconds=within_seconds)
+
+    log = db.query(EntryExitLog).filter(
+        EntryExitLog.plate_number == normalized,
+        EntryExitLog.gate_type == gate_type,
+        EntryExitLog.timestamp >= threshold
+    ).first()
+
+    return log is not None
+
+
+def _create_entry_log(
+    db: Session,
+    camera: Camera,
+    plate: str
+) -> Optional[EntryExitLog]:
+    plate = _normalize_plate(plate)
+
+    if _recent_same_gate_log_exists(db, plate, "entry", within_seconds=15):
+        print(f"[ENTRY] Skip duplicate recent entry for {plate}", flush=True)
+        return None
+
+    open_entry = _find_open_entry_log(db, plate)
+    if open_entry:
+        print(f"[ENTRY] Skip because open entry already exists for {plate}", flush=True)
+        return None
+
+    vehicle = _find_vehicle(db, plate)
+    vehicle_id = vehicle.id if vehicle else None
+    user_id = getattr(vehicle, "owner_user_id", None) if vehicle else None
+
+    reservation = None
+    if vehicle_id:
+        reservation = _find_matching_reservation(db, vehicle_id, datetime.utcnow())
+
+    if not reservation:
+        print(f"[ENTRY] No active reservation for {plate}. Entry not created.", flush=True)
+        return None
+
+    entry_log = EntryExitLog(
+        plate_number=plate,
+        vehicle_id=vehicle_id,
+        user_id=user_id,
+        reservation_id=reservation.id,
+        gate_type="entry",
+        source=camera.name,
+        status="entry_detected",
+        timestamp=datetime.utcnow()
+    )
+    db.add(entry_log)
+    db.flush()
+
+    print("[ENTRY-CREATED]", flush=True)
+    print(f"  id             : {entry_log.id}", flush=True)
+    print(f"  plate_number   : {entry_log.plate_number}", flush=True)
+    print(f"  vehicle_id     : {entry_log.vehicle_id}", flush=True)
+    print(f"  user_id        : {entry_log.user_id}", flush=True)
+    print(f"  reservation_id : {entry_log.reservation_id}", flush=True)
+    print(f"  gate_type      : {entry_log.gate_type}", flush=True)
+    print(f"  source         : {entry_log.source}", flush=True)
+    print(f"  status         : {entry_log.status}", flush=True)
+    print(f"  timestamp      : {entry_log.timestamp}", flush=True)
+    try:
+        if hasattr(reservation, "status"):
+            reservation.status = "active"
+    except Exception:
+        pass
+
+    db.commit()
+    db.refresh(entry_log)
+
+    print(f"[ENTRY] Logged entry for {plate} | reservation={reservation.id}", flush=True)
+    return entry_log
+
+
+def _create_exit_log(
+    db: Session,
+    camera: Camera,
+    plate: str
+) -> Optional[EntryExitLog]:
+    plate = _normalize_plate(plate)
+
+    if _recent_same_gate_log_exists(db, plate, "exit", within_seconds=15):
+        print(f"[EXIT] Skip duplicate recent exit for {plate}", flush=True)
+        return None
+
+    open_entry = _find_open_entry_log(db, plate)
+    if not open_entry:
+        print(f"[EXIT] No open entry found for {plate}. Exit not created.", flush=True)
+        return None
+
+    exit_log = EntryExitLog(
+        plate_number=plate,
+        vehicle_id=open_entry.vehicle_id,
+        user_id=open_entry.user_id,
+        reservation_id=open_entry.reservation_id,
+        gate_type="exit",
+        source=camera.name,
+        status="exit_detected",
+        timestamp=datetime.utcnow(),
+        matched_entry_log_id=open_entry.id
+    )
+    db.add(exit_log)
+    db.flush()  # ensure ID is generated
+
+    print("[EXIT-CREATED]", flush=True)
+    print(f"  id                   : {exit_log.id}", flush=True)
+    print(f"  plate_number         : {exit_log.plate_number}", flush=True)
+    print(f"  vehicle_id           : {exit_log.vehicle_id}", flush=True)
+    print(f"  user_id              : {exit_log.user_id}", flush=True)
+    print(f"  reservation_id       : {exit_log.reservation_id}", flush=True)
+    print(f"  gate_type            : {exit_log.gate_type}", flush=True)
+    print(f"  source               : {exit_log.source}", flush=True)
+    print(f"  status               : {exit_log.status}", flush=True)
+    print(f"  timestamp            : {exit_log.timestamp}", flush=True)
+    print(f"  matched_entry_log_id : {exit_log.matched_entry_log_id}", flush=True)
+
+    if open_entry.reservation_id:
+        reservation = db.query(Reservation).filter(
+            Reservation.id == open_entry.reservation_id
+        ).first()
+        if reservation and hasattr(reservation, "status"):
+            try:
+                reservation.status = "completed"
+            except Exception:
+                pass
+
+    db.commit()
+    db.refresh(exit_log)
+
+    print(
+        f"[EXIT] Logged exit for {plate} | matched_entry_log_id={open_entry.id}",
+        flush=True
+    )
+    return exit_log
+
+
 def process_frame(camera_id: int, zone_id: Optional[int], frame: np.ndarray, **kwargs) -> Dict[str, Any]:
     try:
+        db: Session = kwargs.get("db")
         detections = VisionService.analyze_parking_frame(frame=frame, cam_id=camera_id)
         annotated = VisionService.draw_results(frame, detections)
 
@@ -511,6 +732,33 @@ def process_frame(camera_id: int, zone_id: Optional[int], frame: np.ndarray, **k
                 b"--frame\r\n"
                 b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
             )
+
+        if db:
+            camera = db.query(Camera).filter(Camera.id == camera_id).first()
+            gate_type = _detect_gate_type(camera) if camera else None
+
+            if gate_type:
+                for d in detections:
+                    if not (d.get("should_log") and d.get("plate_number") and d.get("is_confirmed")):
+                        continue
+
+                    plate = _normalize_plate(d["plate_number"])
+
+                    tracks = VisionService._get_camera_tracks(camera_id)
+                    track_id = d["track_id"]
+                    if track_id in tracks:
+                        tracks[track_id].logged_to_db = True
+
+                    try:
+                        if gate_type == "entry":
+                            _create_entry_log(db, camera, plate)
+
+                        elif gate_type == "exit":
+                            _create_exit_log(db, camera, plate)
+
+                    except Exception as log_error:
+                        db.rollback()
+                        print(f"[ENTRY-EXIT-ERROR] {plate} | {log_error}", flush=True)
 
         confirmed_plates = sorted({
             d["plate_number"]
@@ -524,54 +772,31 @@ def process_frame(camera_id: int, zone_id: Optional[int], frame: np.ndarray, **k
             if d.get("plate_number")
         })
 
-        if all_detected_plates:
-            print(
-                f"[ALPR-FRAME] Cam {camera_id} | All detected plates: {', '.join(all_detected_plates)}",
-                flush=True
-            )
-        else:
-            print(
-                f"[ALPR-FRAME] Cam {camera_id} | No readable plates detected",
-                flush=True
-            )
-
-        return {
+        result = {
             "camera_id": camera_id,
             "zone_id": zone_id,
             "plates": confirmed_plates,
             "all_detected_plates": all_detected_plates,
             "detections": detections,
-            "all_detection_details": [
-                {
-                    "track_id": d.get("track_id"),
-                    "plate_number": d.get("plate_number"),
-                    "is_confirmed": d.get("is_confirmed", False),
-                    "stable_hits": d.get("stable_hits", 0),
-                    "ocr_attempts": d.get("ocr_attempts", 0),
-                    "plate_confidence": d.get("plate_confidence", 0.0),
-                    "bbox": {
-                        "x": d.get("x"),
-                        "y": d.get("y"),
-                        "w": d.get("w"),
-                        "h": d.get("h"),
-                    },
-                }
-                for d in detections
-            ],
             "confirmed_count": len(confirmed_plates),
             "all_detected_count": len(all_detected_plates),
             "raw_detection_count": len(detections),
+            "timestamp": time.time()
         }
+
+        latest_results[camera_id] = result
+        return result
 
     except Exception as e:
         print(f"[ALPR-ERROR] Camera {camera_id}: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         return {
             "camera_id": camera_id,
             "zone_id": zone_id,
             "plates": [],
             "all_detected_plates": [],
             "detections": [],
-            "all_detection_details": [],
             "confirmed_count": 0,
             "all_detected_count": 0,
             "raw_detection_count": 0,

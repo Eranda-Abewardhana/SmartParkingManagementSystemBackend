@@ -17,6 +17,9 @@ class EntryExitStatus(str, Enum):
     MANUAL_OVERRIDE = "manual_override"
     DENIED = "denied"
     DETECTED = "detected"
+    PROCESSED = "processed"
+    ENTRY_DETECTED = "entry_detected"
+    EXIT_DETECTED = "exit_detected"
 
 
 class EntryExitBase(BaseModel):
@@ -57,6 +60,7 @@ class EntryExitLogSummary(BaseModel):
     source: str
     status: EntryExitStatus
     notes: Optional[str] = None
+    matched_entry_log_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
