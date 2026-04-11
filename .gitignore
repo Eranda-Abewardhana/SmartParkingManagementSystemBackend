@@ -1,0 +1,19 @@
+# env
+.env
+
+# python
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+
+# models / weights
+*.pt
+
+# temp folders
+media_cache/
+debug_plates/
+
+# OS
+.DS_Store
